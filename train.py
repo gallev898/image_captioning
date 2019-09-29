@@ -1,18 +1,22 @@
 import sys
+
+
 sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 
 import time
-import torch.backends.cudnn as cudnn
+import argparse
 import torch.optim
 import torch.utils.data
+
+import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
+
 from torch import nn
-from torch.nn.utils.rnn import pack_padded_sequence
+from utils import *
 from models import Encoder, DecoderWithAttention
 from datasets import *
-from utils import *
+from torch.nn.utils.rnn import pack_padded_sequence
 from nltk.translate.bleu_score import corpus_bleu
-import argparse
 
 
 parser = argparse.ArgumentParser(description='train')
@@ -38,6 +42,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # sets de
 cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
 
 # Training parameters
+fine_tune_encoder = True  # fine-tune encoder?
+
 start_epoch = 0
 epochs = 120  # number of epochs to train for (if early stopping is not triggered)
 epochs_since_improvement = 0  # keeps track of number of epochs since there's been an improvement in validation BLEU
@@ -49,7 +55,6 @@ grad_clip = 5.  # clip gradients at an absolute value of
 alpha_c = 1.  # regularization parameter for 'doubly stochastic attention', as in the paper
 best_bleu4 = 0.  # BLEU-4 score right now
 print_freq = 100  # print training/validation stats every __ batches
-fine_tune_encoder = False  # fine-tune encoder?
 checkpoint = None  # path to checkpoint, None if none
 
 
@@ -109,11 +114,12 @@ def main():
     criterion = nn.CrossEntropyLoss().to(device)
 
     # Custom dataloaders
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
     train_loader = torch.utils.data.DataLoader(
         CaptionDataset(data_folder, data_name, 'TRAIN', transform=transforms.Compose([normalize])),
         batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
+
     val_loader = torch.utils.data.DataLoader(
         CaptionDataset(data_folder, data_name, 'VAL', transform=transforms.Compose([normalize])),
         batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
@@ -125,11 +131,11 @@ def main():
         # Decay learning rate if there is no improvement for 8 consecutive epochs, and terminate training after 20
         if epochs_since_improvement == 20:
             break
+
         if epochs_since_improvement > 0 and epochs_since_improvement % 8 == 0:
             adjust_learning_rate(decoder_optimizer, 0.8)
             if fine_tune_encoder:
                 adjust_learning_rate(encoder_optimizer, 0.8)
-
 
         # One epoch's training
         train(train_loader=train_loader,
@@ -174,6 +180,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
     :param epoch: epoch number
     """
 
+    # train mode
     decoder.train()  # train mode (dropout and batchnorm is used)
     encoder.train()
 
@@ -186,25 +193,27 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
     # Batches
     for i, (imgs, caps, caplens) in enumerate(train_loader):
-        if args.run_local and i >7:
+
+        if args.run_local and i > 7:
             break
+
         data_time.update(time.time() - start)
 
         # Move to GPU, if available
-        imgs = imgs.to(device)
-        caps = caps.to(device)
-        caplens = caplens.to(device)
+        imgs, caps, caplens = imgs.to(device),  caps.to(device),  caplens.to(device)
 
         # Forward prop.
         imgs = encoder(imgs)
-        scores, caps_sorted, decode_lengths, alphas, sort_ind = decoder(imgs, caps, caplens) # predictions, encoded_captions, decode_lengths, alphas, sort_ind
+        scores, caps_sorted, decode_lengths, alphas, sort_ind = decoder(imgs, caps,
+                                                                        caplens)  # predictions, encoded_captions, decode_lengths, alphas, sort_ind
 
         # Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
         targets = caps_sorted[:, 1:]
 
         # Remove timesteps that we didn't decode at, or are pads
         # pack_padded_sequence is an easy trick to do this
-        scores = pack_padded_sequence(scores, decode_lengths, batch_first=True).data # PackedSequence(data, batch_sizes, sorted_indices, None)
+        scores = pack_padded_sequence(scores, decode_lengths,
+                                      batch_first=True).data  # PackedSequence(data, batch_sizes, sorted_indices, None)
         targets = pack_padded_sequence(targets, decode_lengths, batch_first=True).data
 
         # Calculate loss
@@ -282,7 +291,6 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map):
     with torch.no_grad():
         # Batches
         for i, (imgs, caps, caplens, allcaps) in enumerate(val_loader):
-
             # break after one epoch if debugging locally
             if args.run_local and i > 7:
                 break
@@ -330,16 +338,16 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map):
                 print('Validation: [{0}/{1}]\t'
                       'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Top-5 Accuracy {top5.val:.3f} ({top5.avg:.3f})\t'.format(i, len(val_loader), batch_time=batch_time,
+                      'Top-5 Accuracy {top5.val:.3f} ({top5.avg:.3f})\t'.format(i, len(val_loader),
+                                                                                batch_time=batch_time,
                                                                                 loss=losses, top5=top5accs))
 
             # Store references (true captions), and hypothesis (prediction) for each image
             # If for n images, we have n hypotheses, and references a, b, c... for each image, we need -
             # references = [[ref1a, ref1b, ref1c], [ref2a, ref2b], ...], hypotheses = [hyp1, hyp2, ...]
-
             # References
             allcaps = allcaps[sort_ind]  # because images were sorted in the decoder
-            for j in range(allcaps.shape[0]): # for each example
+            for j in range(allcaps.shape[0]):  # for each example
                 img_caps = allcaps[j].tolist()
                 img_captions = list(
                     map(lambda c: [w for w in c if w not in {word_map['<start>'], word_map['<pad>']}],
@@ -378,14 +386,9 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map):
                 top5=top5accs,
                 bleu=bleu4))
 
-
-
     return bleu4
 
 
 if __name__ == '__main__':
-
     main()
-
-
 # cosine_train.py

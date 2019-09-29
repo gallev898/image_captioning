@@ -1,6 +1,4 @@
 import sys
-
-
 sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 from cosine.cosine_models import Encoder
 from cosine.cosine_models import DecoderWithAttention
