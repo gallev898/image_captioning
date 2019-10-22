@@ -12,8 +12,8 @@ import torch.utils.data
 import torchvision.transforms as transforms
 from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence
-from datasets import *
-from utils import *
+from dataset_loader.datasets import *
+from standart_training.utils import *
 from nltk.translate.bleu_score import corpus_bleu
 import argparse
 
@@ -85,6 +85,8 @@ def main():
     with open(word_map_file, 'r') as j:
         word_map = json.load(j)
     print('load word map COMPLETED')
+
+    # rev word map
     rev_word_map = {v: k for k, v in word_map.items()}  # ix2word
 
     EMBEDDING_SIZE = 300
@@ -134,13 +136,12 @@ def main():
     criterion = nn.CrossEntropyLoss().to(device)
 
     # Custom dataloaders
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+
     train_loader = torch.utils.data.DataLoader(
-        CaptionDataset(data_folder, data_name, 'TRAIN', transform=transforms.Compose([normalize])),
+        CaptionDataset(data_folder, data_name, 'TRAIN', transform=transforms.Compose([data_normalization])),
         batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
     val_loader = torch.utils.data.DataLoader(
-        CaptionDataset(data_folder, data_name, 'VAL', transform=transforms.Compose([normalize])),
+        CaptionDataset(data_folder, data_name, 'VAL', transform=transforms.Compose([data_normalization])),
         batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
 
     # Epochs
@@ -201,6 +202,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
     :param epoch: epoch number
     """
 
+    # train mode
     decoder.train()  # train mode (dropout and batchnorm is used)
     encoder.train()
 
@@ -213,18 +215,21 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
     # Batches
     for i, (imgs, caps, caplens) in enumerate(train_loader):
-        if args.run_local and i >7:
+        if args.run_local and i > 7:
             break
+
         data_time.update(time.time() - start)
 
         # Move to GPU, if available
-        imgs = imgs.to(device)
-        caps = caps.to(device)
-        caplens = caplens.to(device)
+        imgs, caps, caplens = imgs.to(device), caps.to(device), caplens.to(device)
 
-        # Forward prop.
+        # Forward encoder
         imgs = encoder(imgs)
+
+        # Forward decoder
         scores, prenorm_scores, caps_sorted, decode_lengths, alphas, sort_ind = decoder(imgs, caps, caplens) # predictions, encoded_captions, decode_lengths, alphas, sort_ind
+
+        # normalize rmbedding and get scores
         normalized_embeddings = F.normalize(embeddings, p=2, dim=0)
         scores = F.log_softmax(scores.matmul(normalized_embeddings)*args.scale, dim=1)
 
@@ -293,10 +298,12 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map, embeddings):
     :param criterion: loss layer
     :return: BLEU-4 score
     """
-    decoder.eval()  # eval mode (no dropout or batchnorm)
+    # eval mode
+    decoder.eval()
     if encoder is not None:
         encoder.eval()
 
+    # meter
     batch_time = AverageMeter()
     losses = AverageMeter()
     top5accs = AverageMeter()
@@ -311,7 +318,6 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map, embeddings):
     with torch.no_grad():
         # Batches
         for i, (imgs, caps, caplens, allcaps) in enumerate(val_loader):
-
             # break after one epoch if debugging locally
             if args.run_local and i > 7:
                 break
@@ -365,10 +371,9 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map, embeddings):
             # Store references (true captions), and hypothesis (prediction) for each image
             # If for n images, we have n hypotheses, and references a, b, c... for each image, we need -
             # references = [[ref1a, ref1b, ref1c], [ref2a, ref2b], ...], hypotheses = [hyp1, hyp2, ...]
-
             # References
             allcaps = allcaps[sort_ind]  # because images were sorted in the decoder
-            for j in range(allcaps.shape[0]): # for each example
+            for j in range(allcaps.shape[0]):  # for each example
                 img_caps = allcaps[j].tolist()
                 img_captions = list(
                     map(lambda c: [w for w in c if w not in {word_map['<start>'], word_map['<pad>']}],
@@ -391,11 +396,17 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map, embeddings):
 
             if (i + 1) % 300 == 0:
                 print('************print captions***********')
+                num_to_print = 0
                 for h in hypotheses:
-                    words = []
-                    for w in h:
-                        words.append(rev_word_map[w])
-                    print(' '.join(words))
+                    if num_to_print < 100:
+                        words = []
+                        for w in h:
+                            words.append(rev_word_map[w])
+                        print(' '.join(words))
+                        num_to_print += 1
+                    else:
+                        break
+
                 print('**************************************')
 
         # Calculate BLEU-4 scores
@@ -407,14 +418,8 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map, embeddings):
                 top5=top5accs,
                 bleu=bleu4))
 
-
-
     return bleu4
 
 
 if __name__ == '__main__':
-
     main()
-
-
-# cosine_train.py

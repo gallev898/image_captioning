@@ -1,5 +1,6 @@
 import sys
 
+from dataset_loader.dataloader import load
 from standart_training.utils import data_normalization
 
 
@@ -32,7 +33,6 @@ parser.add_argument('--run_local', default=False, action='store_true')
 parser.add_argument('--ood', default=False, action='store_true')
 parser.add_argument('--all_data', default=False, action='store_true')
 parser.add_argument('--limit_ex', type=int, default=1)
-parser.add_argument('--ood_limit_ex', type=int, default=1)
 parser.add_argument('--beam_size', default=5, type=int)
 parser.add_argument('--dont_smooth', dest='smooth', action='store_false', help='do not smooth alpha overlay')
 args = parser.parse_args()
@@ -57,28 +57,19 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
 
     k = beam_size
     vocab_size = len(word_map)
-    img1 = None
 
-    # OOD
-    if image_path is None:
-        img1 = np.random.uniform(low=0., high=255., size=(256, 256, 3))
-        img1 = np.uint8(img1)
-        img = img1
-    else:
-        # Read image and process
-        img = imread(image_path)
-        if len(img.shape) == 2:
-            img = img[:, :, np.newaxis]
-            img = np.concatenate([img, img, img], axis=2)
-        img = imresize(img, (256, 256))
+    # Read image and process
+    img = imread(image_path)
+    if len(img.shape) == 2:
+        img = img[:, :, np.newaxis]
+        img = np.concatenate([img, img, img], axis=2)
+    img = imresize(img, (256, 256))
 
     img = img.transpose(2, 0, 1)
     img = img / 255.
     img = torch.FloatTensor(img).to(device)
-
     transform = transforms.Compose([data_normalization])
     image = transform(img)  # (3, 256, 256)
-
 
     # Encode
     image = image.unsqueeze(0)  # (1, 3, 256, 256)
@@ -204,10 +195,10 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
     seq = complete_seqs[i]
     alphas = complete_seqs_alpha[i]
 
-    return seq, alphas, top_seq_total_scors, seq_sum, exception_data_name, img1
+    return seq, alphas, top_seq_total_scors, seq_sum, exception_data_name
 
 
-def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, ood_img=None, smooth=True):
+def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, smooth=True):
     """
     Visualizes caption with weights at every word.
 
@@ -219,14 +210,9 @@ def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, sa
     :param rev_word_map: reverse word mapping, i.e. ix2word
     :param smooth: smooth weights?
     """
-    if ood_img is not None and image_path is None:
-        image = Image.fromarray(ood_img)
-        image = image.resize([14 * 24, 14 * 24], Image.LANCZOS)
 
-    else:
-        image = Image.open(image_path)
-        image = image.resize([14 * 24, 14 * 24], Image.LANCZOS)
-
+    image = Image.open(image_path)
+    image = image.resize([14 * 24, 14 * 24], Image.LANCZOS)
 
     words = [rev_word_map[ind] for ind in seq]
 
@@ -250,7 +236,7 @@ def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, sa
         plt.set_cmap(cm.Greys_r)
         plt.axis('off')
 
-    plt.savefig('temp')
+    plt.savefig(os.path.join(save_dir, 'temp'))
     plt.clf()
     return words, image
     # L = torch.load('{}/data'.format(save_dir))
@@ -261,14 +247,14 @@ def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, sa
 
 def run(encoder, decoder, word_map, rev_word_map, save_dir, image_path=None, epoch=None):
     # Encode, decode with attention and beam search
-    seq, alphas, top_seq_total_scors, seq_sum, edn, ood_img = caption_image_beam_search(encoder,
+    seq, alphas, top_seq_total_scors, seq_sum, edn = caption_image_beam_search(encoder,
                                                                                         decoder,
                                                                                         image_path,
                                                                                         word_map,
                                                                                         args.beam_size)
 
     alphas = torch.FloatTensor(alphas)
-    words, image = visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, ood_img,
+    words, image = visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, save_dir,
                                  args.smooth)
     # Visualize caption and attention of best sequence
     print('seq_sum: {}'.format(seq_sum))
@@ -281,10 +267,10 @@ def run(encoder, decoder, word_map, rev_word_map, save_dir, image_path=None, epo
                  'seq_sum': seq_sum,
                  'alphas': alphas}
 
-        if args.ood:
-            saved_to = '{}/{}'.format(save_dir, 'data_ood_num_{}'.format(epoch))
-        else:
-            saved_to = '{}/{}'.format(save_dir, 'data_{}'.format(image_path.split('/')[-1].replace('.jpg', '')))
+        # if args.ood:
+        saved_to = '{}/{}'.format(save_dir, 'data_ood_num_{}'.format(epoch))
+        # else:
+        #     saved_to = '{}/{}'.format(save_dir, 'data_{}'.format(image_path.split('/')[-1].replace('.jpg', '')))
         torch.save(state, saved_to)
 
     return edn
@@ -293,17 +279,12 @@ def run(encoder, decoder, word_map, rev_word_map, save_dir, image_path=None, epo
 if __name__ == '__main__':
     # Creat save dir
     if args.run_local:
-        model_path = filename
-        if args.ood:
-            save_dir = "OOD_GIFs"
-        else:
-            save_dir = "GIFs"
+        desktop_path = os.path.join(os.path.join(os.path.expanduser('~')), 'Desktop')
+        model_path = os.path.join(desktop_path, os.path.join(args.model, filename))
+        save_dir = "GIFs"
     else:
         model_path = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, filename)
-        if args.ood:
-            save_dir = "/yoav_stg/gshalev/image_captioning/{}/OOD_GIFs".format(args.model)
-        else:
-            save_dir = "/yoav_stg/gshalev/image_captioning/{}/GIFs".format(args.model)
+        save_dir = "/yoav_stg/gshalev/image_captioning/{}/GIFs".format(args.model)
 
     # create dir
     if not os.path.exists(save_dir):
@@ -320,46 +301,44 @@ if __name__ == '__main__':
 
     # Load word map (word2ix)
     data_folder = 'output_folder'  # folder with data files saved by create_input_files.py
-    word_map_file = os.path.join(data_folder, 'WORDMAP_' + data_name + '.json')
+    word_map_file = '../WORDMAP_' + data_name + '.json'
 
     # Create rev word map
     with open(word_map_file, 'r') as j:
         word_map = json.load(j)
     rev_word_map = {v: k for k, v in word_map.items()}  # ix2word
 
-    # Create input files
-    if args.ood:
-        for e in range(args.ood_limit_ex):
-            run(encoder, decoder, word_map, rev_word_map, save_dir, epoch=e)
-    else:
-        if args.run_local:
-            desktop_path = os.path.join(os.path.join(os.path.expanduser('~')), 'Desktop')
-            dir = os.path.join(desktop_path, 'datasets/mscoco/val2014')
-            filename = random.choice(os.listdir(dir))
-            img_path = os.path.join(dir, filename)
-        else:
-            dir = '/yoav_stg/gshalev/semantic_labeling/mscoco/val2014'
-            filename = random.choice(os.listdir(dir))
-            img_path = os.path.join(dir, filename)
+    dataloader = load('sbu', args.run_local, 1, 1)
 
-        exception_data_list = list()
-        if args.all_data:
-            for ind, filename in tqdm(enumerate(os.listdir(dir))):
-                img_path = os.path.join(dir, filename)
-                edn = run(encoder, decoder, word_map, rev_word_map, save_dir, image_path=img_path)
-                if edn is not None:
-                    exception_data_list.append(edn)
-                if ind + 1 % 100 == 0:
-                    print('have data for {} files'.format(ind))
-            if len(exception_data_list) > 0:
-                torch.save(exception_data_list, save_dir.replace('/GIFs', '/exception_data_list'))
-        else:
-            limit = 0
-            for ind in range(args.limit_ex):
-                filename = random.choice(os.listdir(dir))
-                img_path = os.path.join(dir, filename)
-                edn = run(encoder, decoder, word_map, rev_word_map, save_dir, image_path=img_path)
-                if edn is not None:
-                    exception_data_list.append(edn)
-                if ind + 1 % 100 == 0:
-                    print('have data for {} files'.format(ind))
+    # Create input files
+    if args.run_local:
+        desktop_path = os.path.join(os.path.join(os.path.expanduser('~')), 'Desktop')
+        dir = os.path.join(desktop_path, 'datasets/sbu/dataset')
+        filename = random.choice(os.listdir(dir))
+        img_path = os.path.join(dir, filename)
+    else:
+        dir = '/yoav_stg/gshalev/semantic_labeling/mscoco/val2014'
+        filename = random.choice(os.listdir(dir))
+        img_path = os.path.join(dir, filename)
+
+    exception_data_list = list()
+    if args.all_data:
+        for ind, filename in tqdm(enumerate(os.listdir(dir))):
+            img_path = os.path.join(dir, filename)
+            edn = run(encoder, decoder, word_map, rev_word_map, save_dir, image_path=img_path)
+            if edn is not None:
+                exception_data_list.append(edn)
+            if ind + 1 % 100 == 0:
+                print('have data for {} files'.format(ind))
+        if len(exception_data_list) > 0:
+            torch.save(exception_data_list, save_dir.replace('/GIFs', '/exception_data_list'))
+    else:
+        limit = 0
+        for ind in range(args.limit_ex):
+            filename = random.choice(os.listdir(dir))
+            img_path = os.path.join(dir, filename)
+            edn = run(encoder, decoder, word_map, rev_word_map, save_dir, image_path=img_path)
+            if edn is not None:
+                exception_data_list.append(edn)
+            if ind + 1 % 100 == 0:
+                print('have data for {} files'.format(ind))

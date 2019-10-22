@@ -11,6 +11,10 @@ from tqdm import tqdm
 from collections import Counter
 from random import seed, choice, sample
 
+import torchvision.transforms as transforms
+
+data_normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
 
 def create_input_files(limit, dataset, karpathy_json_path, image_folder, captions_per_image, min_word_freq, output_folder,
                        max_len=100):
@@ -309,3 +313,6 @@ def accuracy(scores, targets, k):
     correct = top_ind.eq(targets.view(-1, 1).expand_as(top_ind)) # targets.unsqueeze(1) == targets.view(-1, 1)
     correct_total = correct.view(-1).float().sum()  # 0D tensor
     return correct_total.item() * (100.0 / batch_size)
+
+
+# utils.py

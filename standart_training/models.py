@@ -3,12 +3,10 @@ sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 
 import torch
 from torch import nn
-import torch.nn.functional as F
 import torchvision
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# wandb login a8c4526db3e8aa11d7b2674d7c257c58313b45ca
 
 class Encoder(nn.Module):
     """
@@ -84,7 +82,7 @@ class Attention(nn.Module):
         :return: attention weighted encoding, weights
         """
         att1 = self.encoder_att(encoder_out)  # (batch_size, num_pixels, attention_dim)
-        att2 = self.decoder_att(decoder_hidden)  # (batch_size, attention_dim)
+        att2 = self.decoder_att(decoder_hidden)  # (batch_size, attention_dim)חלק זה לא באמת משנה את המימד כי הם נכנסים באותו גודל כמו שיומאים אבל אולי ככה נילמד ייצוג יותר טוב של ההידן
         att2 = att2.unsqueeze(1)
         att = self.full_att(self.relu(att1 + att2)).squeeze(2)  # (batch_size, num_pixels)
         alpha = self.softmax(att)  # (batch_size, num_pixels)
@@ -98,7 +96,7 @@ class DecoderWithAttention(nn.Module):
     Decoder.
     """
 
-    def __init__(self, attention_dim, embed_dim, decoder_dim, vocab_size, out_dim, encoder_dim=2048, dropout=0.5):
+    def __init__(self, attention_dim, embed_dim, decoder_dim, vocab_size, device, encoder_dim=2048, dropout=0.5):
         """
         :param attention_dim: size of attention network
         :param embed_dim: embedding size
@@ -115,23 +113,19 @@ class DecoderWithAttention(nn.Module):
         self.decoder_dim = decoder_dim
         self.vocab_size = vocab_size
         self.dropout = dropout
-        self.out_dim = out_dim
 
         self.attention = Attention(encoder_dim, decoder_dim, attention_dim)  # attention network
 
         self.embedding = nn.Embedding(vocab_size, embed_dim)  # embedding layer
-
-        # self.word_embedding = nn.Embedding(vocab_size, embed_dim)  # embedding layer
-        # self.word_embedding.weight.requires_grad = False
-
         self.dropout = nn.Dropout(p=self.dropout)
         self.decode_step = nn.LSTMCell(embed_dim + encoder_dim, decoder_dim, bias=True)  # decoding LSTMCell
         self.init_h = nn.Linear(encoder_dim, decoder_dim)  # linear layer to find initial hidden state of LSTMCell
         self.init_c = nn.Linear(encoder_dim, decoder_dim)  # linear layer to find initial cell state of LSTMCell
         self.f_beta = nn.Linear(decoder_dim, encoder_dim)  # linear layer to create a sigmoid-activated gate
         self.sigmoid = nn.Sigmoid()
-        self.fc = nn.Linear(decoder_dim, out_dim)  # linear layer to find scores over vocabulary
+        self.fc = nn.Linear(decoder_dim, vocab_size)  # linear layer to find scores over vocabulary
         self.init_weights()  # initialize some layers with the uniform distribution
+        self.device = device
 
     def init_weights(self):
         """
@@ -204,9 +198,8 @@ class DecoderWithAttention(nn.Module):
         decode_lengths = (caption_lengths - 1).tolist()
 
         # Create tensors to hold word predicion scores and alphas
-        predictions = torch.zeros(batch_size, max(decode_lengths), self.out_dim).to(device)
-        prenorm_predictions = torch.zeros(batch_size, max(decode_lengths), self.out_dim).to(device)
-        alphas = torch.zeros(batch_size, max(decode_lengths), num_pixels).to(device)
+        predictions = torch.zeros(batch_size, max(decode_lengths), vocab_size).to(self.device)
+        alphas = torch.zeros(batch_size, max(decode_lengths), num_pixels).to(self.device)
 
         # At each time-step, decode by
         # attention-weighing the encoder's output based on the decoder's previous hidden state output
@@ -220,7 +213,7 @@ class DecoderWithAttention(nn.Module):
             hidden_state = h[:batch_size_t]
             cell_state = c[:batch_size_t]
 
-            attention_weighted_encoding, alpha = self.attention(enc_out, hidden_state) #עושים אטנשיין עם ההידן האחרון וכל האוטפוטים
+            attention_weighted_encoding, alpha = self.attention(enc_out, hidden_state) #עושים אטנשיין עם ההידן האחרון וכל  אחד מהחלקים בתמונה
 
             gate = self.sigmoid(self.f_beta(hidden_state))  # gating scalar, (batch_size_t, encoder_dim) TODO: this is bla bla
             attention_weighted_encoding = gate * attention_weighted_encoding #  TODO: this is bla bla  -  motivated by dropout "like" - type of regularization, gate of [0,1] because of sigmoid
@@ -230,13 +223,8 @@ class DecoderWithAttention(nn.Module):
 
             #insert to decoder block
             h, c = self.decode_step(the_concatinantion_of_att_and_the_input_word, (hidden_state, cell_state))  # (batch_size_t, decoder_dim)
-            # TODO maybe replece the order of dropout and fc
-            h = self.dropout(h)
-            out_pre_norm = self.fc(h)  # (batch_size_t, embedding size)
-            out = F.normalize(out_pre_norm, p=2, dim=1)
-
-            predictions[:batch_size_t, t, :] = out
-            prenorm_predictions[:batch_size_t, t, :] = out_pre_norm
+            preds = self.fc(self.dropout(h))  # (batch_size_t, vocab_size)
+            predictions[:batch_size_t, t, :] = preds
             alphas[:batch_size_t, t, :] = alpha
 
-        return predictions, prenorm_predictions, encoded_captions, decode_lengths, alphas, sort_ind
+        return predictions, encoded_captions, decode_lengths, alphas, sort_ind

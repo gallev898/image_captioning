@@ -5,8 +5,8 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import torchvision.transforms as transforms
-from datasets import *
-from utils import *
+from dataset_loader.datasets import *
+from standart_training.utils import *
 from nltk.translate.bleu_score import corpus_bleu
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -34,9 +34,6 @@ with open(word_map_file, 'r') as j:
 rev_word_map = {v: k for k, v in word_map.items()}
 vocab_size = len(word_map)
 
-# Normalization transform
-normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
 
 
 def evaluate(beam_size):
@@ -48,7 +45,7 @@ def evaluate(beam_size):
     """
     # DataLoader
     loader = torch.utils.data.DataLoader(
-        CaptionDataset(data_folder, data_name, 'TEST', transform=transforms.Compose([normalize])),
+        CaptionDataset(data_folder, data_name, 'TEST', transform=transforms.Compose([data_normalization])),
         batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
 
     # TODO: Batched Beam Search

@@ -1,7 +1,7 @@
 import sys
 sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 
-from utils import create_input_files
+from standart_training.utils import create_input_files
 import os
 import argparse
 
