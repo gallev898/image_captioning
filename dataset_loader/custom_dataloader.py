@@ -1,13 +1,11 @@
 from __future__ import print_function, division
 import os
+
 import torch
-from skimage import io, transform
-import numpy as np
-import matplotlib.pyplot as plt
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
-import torchvision
+
 from PIL import Image
+from torch.utils.data import Dataset
+
 
 class Custom_Image_Dataset(torch.utils.data.Dataset):
 
@@ -38,4 +36,3 @@ class Custom_Image_Dataset(torch.utils.data.Dataset):
         img = self.imgs[index]
 
         return img
-

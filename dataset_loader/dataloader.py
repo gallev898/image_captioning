@@ -1,11 +1,8 @@
-import os
-import torch
 import torchvision
-import torchvision.transforms as transforms
 
-# from dataset_loader.custom_dataloader import Custom_Dataset
+from dataset_loader.custom_dataloader import Custom_Image_Dataset
 from dataset_loader.flickr_parser import Flickr30k
-from standart_training.utils import data_normalization
+from utils import *
 
 
 def cifar10_loader(run_local, batch_size, num_workers):
@@ -46,7 +43,6 @@ def cifar100_loader(run_local, batch_size, num_workers):
 
     transform = transforms.Compose(
         [transforms.ToTensor(),
-         # transforms.Resize(256),
          data_normalization
          ])
 
@@ -155,5 +151,5 @@ def load(dataset, run_local, batch_size, num_workers):
     # elif dataset == 'custom':
         # return custom_loader(run_local, batch_size, num_workers)
     elif dataset == 'flicker':
-        return flicker_loader(run_local, batch_size, num_workers)
+        return flicker_loader(run_local)
 # dataloader.py
