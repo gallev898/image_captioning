@@ -11,10 +11,6 @@ from tqdm import tqdm
 from collections import Counter
 from random import seed, choice, sample
 
-import torchvision.transforms as transforms
-
-data_normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
 
 def create_input_files(limit, dataset, karpathy_json_path, image_folder, captions_per_image, min_word_freq, output_folder,
                        max_len=100):
