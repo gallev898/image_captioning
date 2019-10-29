@@ -102,28 +102,23 @@ def sbu_loader(run_local, batch_size, num_workers, crop=False):
     return dataloader
 
 
-# def custom_loader(run_local, batch_size, num_workers):
-#     desktop_path = os.path.join(os.path.join(os.path.expanduser('~')), 'Desktop')
-#     data_path = os.path.join(desktop_path, 'datasets/mscoco/val2014')
-#
-#     transform = transforms.Compose([
-#         transforms.Resize((256, 256)),
-#         transforms.ToTensor(),
-#         data_normalization
-#         ])
-#     train_dataset = Custom_Dataset(
-#         root=data_path,
-#         transform=transform
-#         )
-#     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers,
-#                                                shuffle=True)
-#     return train_loader
+def custom_loader(run_local, batch_size, num_workers):
+    transform = transforms.Compose([
+        transforms.Resize(256),
+        transforms.ToTensor(),
+        data_normalization
+        ])
+
+    data = Custom_Image_Dataset(os.path.join(desktop_path, 'custom_images'), transform)
+
+    dataloader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    return dataloader
 
 
 def flicker_loader(run_local):
     desktop_path = os.path.join(os.path.join(os.path.expanduser('~')), 'Desktop')
     data_path = os.path.join(desktop_path, 'datasets/flicker') if run_local else os.curdir
-
 
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
@@ -132,9 +127,7 @@ def flicker_loader(run_local):
         ])
 
     train_loader = Flickr30k(root=os.path.join(data_path, 'Flicker8k_Dataset'),
-                                                 ann_file=os.path.join(data_path, 'Flickr8k_text/Flickr8k.token.txt'), transform=transform)
-
-
+                             ann_file=os.path.join(data_path, 'Flickr8k_text/Flickr8k.token.txt'), transform=transform)
 
     return train_loader
 
@@ -148,8 +141,8 @@ def load(dataset, run_local, batch_size, num_workers):
         return svhn_loader(run_local, batch_size, num_workers)
     elif dataset == 'sbu':
         return sbu_loader(run_local, batch_size, num_workers)
-    # elif dataset == 'custom':
-        # return custom_loader(run_local, batch_size, num_workers)
+    elif dataset == 'custom':
+        return custom_loader(run_local, batch_size, num_workers)
     elif dataset == 'flicker':
         return flicker_loader(run_local)
 # dataloader.py
