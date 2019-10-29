@@ -1,5 +1,7 @@
 import sys
 
+from utils import data_normalization
+
 
 sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
@@ -11,7 +13,6 @@ import argparse
 import en_core_web_sm
 
 from tqdm import tqdm
-from standart_training.utils import data_normalization
 from dataset_loader.datasets import CaptionDataset
 from dataset_loader.dataloader import load, flicker_loader
 

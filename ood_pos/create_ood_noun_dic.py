@@ -7,7 +7,7 @@ import json
 import torch
 
 from dataset_loader.datasets import CaptionDataset
-from standart_training.utils import data_normalization
+from utils import data_normalization
 
 
 coco_data = os.path.curdir

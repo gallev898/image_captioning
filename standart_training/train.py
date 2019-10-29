@@ -1,5 +1,7 @@
 import sys
 
+from utils import data_normalization
+
 
 sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 

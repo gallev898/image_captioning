@@ -24,7 +24,7 @@ class Encoder(nn.Module):
         modules = list(resnet.children())[:-2]
         self.resnet = nn.Sequential(*modules)
 
-        # Resize image to fixed size to allow input images of variable size
+        # !!! Resize image to fixed size to allow input images of variable size
         self.adaptive_pool = nn.AdaptiveAvgPool2d((encoded_image_size, encoded_image_size))
 
         self.fine_tune()
@@ -33,7 +33,7 @@ class Encoder(nn.Module):
         """
         Forward propagation.
 
-        :param images: images, a tensor of dimensions (batch_size, 3, image_size, image_size)
+        :param images: images, a tensor of dimensions (batch_size, 3, image_size(H), image_size(W))
         :return: encoded images
         """
         out = self.resnet(images)  # (batch_size, 2048, image_size/32, image_size/32)
@@ -82,7 +82,7 @@ class Attention(nn.Module):
         :return: attention weighted encoding, weights
         """
         att1 = self.encoder_att(encoder_out)  # (batch_size, num_pixels, attention_dim)
-        att2 = self.decoder_att(decoder_hidden)  # (batch_size, attention_dim)חלק זה לא באמת משנה את המימד כי הם נכנסים באותו גודל כמו שיומאים אבל אולי ככה נילמד ייצוג יותר טוב של ההידן
+        att2 = self.decoder_att(decoder_hidden)  # (batch_size, attention_dim)חלק זה לא באמת משנה את המימד כי הם נכנסים באותו גודל כמו שיוצאים אבל אולי ככה נילמד ייצוג יותר טוב של ההידן
         att2 = att2.unsqueeze(1)
         att = self.full_att(self.relu(att1 + att2)).squeeze(2)  # (batch_size, num_pixels)
         alpha = self.softmax(att)  # (batch_size, num_pixels)

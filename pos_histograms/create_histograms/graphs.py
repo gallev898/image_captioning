@@ -4,12 +4,12 @@ import numpy as np
 import os
 
 if __name__ == '__main__':
-    dic_type = 'svhn'
+    dic_type = 'random'
 
     if not os.path.exists(dic_type):
         os.mkdir(dic_type)
 
-    dic = torch.load('pos_dic/pos_dic_{}'.format(dic_type))
+    dic = torch.load('../create_dic/pos_dic/pos_dic_{}'.format(dic_type))
     pos_dic = dic['pos']
     noun_phrase_sum_of_log_prop = dic['noun_phrase_sum_of_log_prop']
 
