@@ -16,23 +16,7 @@ import en_core_web_sm
 
 import numpy as np
 
-
-# args
-parser = argparse.ArgumentParser(description='Show, Attend, and Tell - Tutorial - Generate Caption')
-parser.add_argument('--model', type=str)
-parser.add_argument('--run_local', default=False, action='store_true')
-parser.add_argument('--ood', default=False, action='store_true')
-parser.add_argument('--all_data', default=False, action='store_true')
-parser.add_argument('--limit_ex', type=int, default=1)
-parser.add_argument('--beam_size', default=1, type=int)
-parser.add_argument('--dont_smooth', dest='smooth', action='store_false', help='do not smooth alpha overlay')
-parser.add_argument('--top', type=str, default='k')
-args = parser.parse_args()
-
-# global
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-data_name = 'coco_5_cap_per_img_5_min_word_freq'
-filename = 'BEST_checkpoint_' + data_name + '.pth.tar'
+args = get_args()
 
 
 def visualize_att(image, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_name, smooth=True):
@@ -63,9 +47,7 @@ def visualize_att(image, seq, alphas, rev_word_map, top_seq_total_scors, save_di
                          image_name)
 
 
-def run(encoder, decoder, word_map, rev_word_map, save_dir, top_k, top_p, image_data):
-    image = image_data[0]
-    image_title = image_data[1]
+def run(encoder, decoder, word_map, rev_word_map, save_dir, top_k, top_p, image, image_title):
 
     seq, alphas, top_seq_total_scors, seqs_scores_logits = caption_image(encoder,
                                                      decoder,
@@ -94,4 +76,7 @@ if __name__ == '__main__':
     dataloader = load('custom', True, 1, 1)
 
     for ind, image_data in enumerate(dataloader):
-        run(encoder, decoder, word_map, rev_word_map, save_dir, top_k, top_p, image_data)
+        image = image_data[0]
+        image_title = image_data[1][0]
+
+        run(encoder, decoder, word_map, rev_word_map, save_dir, top_k, top_p, image, image_title)

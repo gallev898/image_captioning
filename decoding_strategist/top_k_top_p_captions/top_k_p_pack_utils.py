@@ -1,3 +1,11 @@
+
+import sys
+
+
+sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
+# sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+
 import os
 
 import torch
@@ -42,8 +50,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     return logits
 
 
-def caption_image(encoder, decoder, image_path, word_map, top_k, top_p):
-    image = image_path
+def caption_image(encoder, decoder, image, word_map, top_k, top_p):
 
     # Here is how to use this function for top-p sampling
     temperature = 1.0
@@ -57,19 +64,18 @@ def caption_image(encoder, decoder, image_path, word_map, top_k, top_p):
     encoder_out = encoder_out.view(1, -1, encoder_dim)  # (1, num_pixels, encoder_dim)
     num_pixels = encoder_out.size(1)
 
-    k = 1
-    encoder_out = encoder_out.expand(k, num_pixels, encoder_dim)
+    encoder_out = encoder_out.expand(1, num_pixels, encoder_dim)
 
-    k_prev_words = torch.LongTensor([word_map['<start>']]).to(device)
-    seqs = k_prev_words
-    seqs_scores = torch.FloatTensor([0.]).to(device)
-    seqs_scores_logits = torch.FloatTensor([0.]).to(device)
+    prev_word = torch.LongTensor([word_map['<start>']]).to(device)
+    seqs = prev_word
+    seqs_prop = torch.FloatTensor([0.]).to(device)
+    seqs_logits = torch.FloatTensor([0.]).to(device)
     seqs_alpha = torch.ones(1, enc_image_size, enc_image_size).to(device)
 
     h, c = decoder.init_hidden_state(encoder_out)
 
     while True:
-        embeddings = decoder.embedding(k_prev_words).squeeze(1)
+        embeddings = decoder.embedding(prev_word).squeeze(1)
 
         awe, alpha = decoder.attention(encoder_out, h)
 
@@ -91,15 +97,17 @@ def caption_image(encoder, decoder, image_path, word_map, top_k, top_p):
         # Sample from the filtered distribution
         probabilities = F.softmax(filtered_logits, dim=-1)
         next_token = torch.multinomial(probabilities, 1)
-        seqs_scores = torch.cat((seqs_scores, probabilities[torch.multinomial(probabilities, 1)]))
-        seqs_scores_logits = torch.cat((seqs_scores_logits, filtered_logits[torch.multinomial(probabilities, 1)]))
+        seqs_prop = torch.cat((seqs_prop, probabilities[next_token]))
+        seqs_logits = torch.cat((seqs_logits, filtered_logits[next_token]))
         seqs = torch.cat((seqs, next_token), dim=0)
 
-        k_prev_words = next_token
-        if k == 0 or next_token == word_map['<end>']:
+        prev_word = next_token
+        if next_token == word_map['<end>']:
             break
 
     seqs = [x.item() for x in seqs]
-    seqs_scores = [x.item() for x in seqs_scores]
-    seqs_scores_logits = [x.item() for x in seqs_scores_logits]
-    return seqs, seqs_alpha, seqs_scores, seqs_scores_logits
+    seqs_prop = [x.item() for x in seqs_prop]
+    seqs_logits = [x.item() for x in seqs_logits]
+    return seqs, seqs_alpha, seqs_prop, seqs_logits
+
+# top_k_p_pack_utils.py

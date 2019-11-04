@@ -1,10 +1,29 @@
+import argparse
 import os
+import torch
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import skimage.transform
 
+
+def get_args():
+    # args
+    parser = argparse.ArgumentParser(description='Show, Attend, and Tell - Tutorial - Generate Caption')
+    parser.add_argument('--model', type=str)
+    parser.add_argument('--run_local', default=False, action='store_true')
+    parser.add_argument('--limit_ex', type=int, default=1)
+    parser.add_argument('--beam_size', default=1, type=int)
+    parser.add_argument('--dont_smooth', dest='smooth', action='store_false', help='do not smooth alpha overlay')
+    args = parser.parse_args()
+
+    return args
+
+# global
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+data_name = 'coco_5_cap_per_img_5_min_word_freq'
+filename = 'BEST_checkpoint_' + data_name + '.pth.tar'
 
 def visualization(image, alphas, words, pos, top_seq_total_scors, top_seq_total_scors_exp, smooth, save_dir,
                   image_name):
@@ -13,7 +32,7 @@ def visualization(image, alphas, words, pos, top_seq_total_scors, top_seq_total_
             break
         plt.subplot(np.ceil(len(words) / 5.), 5, t + 1)
 
-        plt.text(0, 1, '{}\n{}\n {:.4f} - \n {:.4f}'.format(words[t], pos[t], top_seq_total_scors[t],
+        plt.text(0, 1, '{}\n{}\n {:.4f}  \n {:.4f}'.format(words[t], pos[t], top_seq_total_scors[t],
                                                             top_seq_total_scors_exp[t]),
                  color='black', backgroundcolor='white',
                  fontsize=12)
@@ -30,6 +49,6 @@ def visualization(image, alphas, words, pos, top_seq_total_scors, top_seq_total_
         plt.set_cmap(cm.Greys_r)
         plt.axis('off')
 
-    plt.savefig(os.path.join(save_dir, 'temp_{}'.format(image_name)))
+    plt.savefig(os.path.join(save_dir, image_name))
     plt.clf()
     return words, image

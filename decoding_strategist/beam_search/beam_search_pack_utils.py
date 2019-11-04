@@ -1,13 +1,50 @@
-import torch
+import sys
+
+
+sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
+sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+
+import argparse
 
 import numpy as np
 import torch.nn.functional as F
 
 from utils import *
-import argparse
 
 
-def beam_search_decode(encoder, image, beam_size, word_map, decoder, vocab_size):
+def encode(encoder, image, beam_size, word_map):
+
+    # Encode - return the output of resnet as 2048 channels
+    encoder_out = encoder(image)  # (1, enc_image_size, enc_image_size, encoder_dim)
+    enc_image_size = encoder_out.size(1)
+    encoder_dim = encoder_out.size(3)
+
+    # Flatten encoding
+    encoder_out = encoder_out.view(1, -1, encoder_dim)  # (1, num_pixels, encoder_dim)
+    num_pixels = encoder_out.size(1) # num of pixels in each
+
+    # We'll treat the problem as having a batch size of k
+    encoder_out = encoder_out.expand(beam_size, num_pixels, encoder_dim)  # (k, num_pixels, encoder_dim)
+
+    # Tensor to store top k previous words at each step; now they're just <start>
+    k_prev_words = torch.LongTensor([[word_map['<start>']]] * beam_size).to(device)  # (k, 1)
+
+    # Tensor to store top k sequences; now they're just <start>
+    seqs = k_prev_words  # (k, 1)
+    seqs_scores = torch.FloatTensor([[0.]] * beam_size).to(device)
+
+    # Tensor to store top k sequences' scores; now they're just 0
+    top_k_scores = torch.zeros(beam_size, 1).to(device)  # (k, 1)
+
+    # Tensor to store top k sequences' alphas; now they're just 1s
+    seqs_alpha = torch.ones(beam_size, 1, enc_image_size, enc_image_size).to(device) # NOTICE: for visualization
+
+    return encoder_out, enc_image_size, k_prev_words, seqs, seqs_scores, top_k_scores, seqs_alpha
+
+
+def beam_search_decode(encoder, image, beam_size, word_map, decoder):
+    vocab_size = len(word_map)
+
     # Encode
     encoder_out, enc_image_size, k_prev_words, seqs, seqs_scores, top_k_scores, seqs_alpha = encode(encoder, image,
                                                                                                     beam_size,
@@ -129,14 +166,15 @@ def beam_search_decode(encoder, image, beam_size, word_map, decoder, vocab_size)
 def get_args():
     # args
     parser = argparse.ArgumentParser(description='Show, Attend, and Tell - Tutorial - Generate Caption')
+
     parser.add_argument('--model', type=str)
     parser.add_argument('--save_dir_name', type=str, default='beam_size')
     parser.add_argument('--run_local', default=False, action='store_true')
-    parser.add_argument('--ood', default=False, action='store_true')
-    parser.add_argument('--all_data', default=False, action='store_true')
     parser.add_argument('--limit_ex', type=int, default=5)
     parser.add_argument('--beam_size', default=5, type=int)
     parser.add_argument('--dont_smooth', dest='smooth', action='store_false', help='do not smooth alpha overlay')
     args = parser.parse_args()
 
     return args
+
+# beam_search_pack_utils.py

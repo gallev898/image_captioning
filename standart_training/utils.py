@@ -11,6 +11,10 @@ from tqdm import tqdm
 from collections import Counter
 from random import seed, choice, sample
 
+data_folder = '../output_folder'  # folder with data files saved by create_input_files.py
+data_name = 'coco_5_cap_per_img_5_min_word_freq'  # base name shared by data files
+
+
 
 def create_input_files(limit, dataset, karpathy_json_path, image_folder, captions_per_image, min_word_freq, output_folder,
                        max_len=100):

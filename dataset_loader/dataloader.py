@@ -1,8 +1,14 @@
+import sys
+
+
+sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
+sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+
 import torchvision
 
-from dataset_loader.custom_dataloader import Custom_Image_Dataset
-from dataset_loader.flickr_parser import Flickr30k
 from utils import *
+from dataset_loader.flickr_parser import Flickr30k
+from dataset_loader.custom_dataloader import Custom_Image_Dataset
 
 
 def cifar10_loader(run_local, batch_size, num_workers):
@@ -14,7 +20,6 @@ def cifar10_loader(run_local, batch_size, num_workers):
 
     transform = transforms.Compose([
         transforms.ToTensor(),
-        # transforms.Resize(256),
         data_normalization
         ])
 
@@ -132,6 +137,20 @@ def flicker_loader(run_local):
     return train_loader
 
 
+def pre_custom_loader(batch_size, num_workers, file_num=None):
+    transform = transforms.Compose([
+        transforms.Resize(256),
+        transforms.ToTensor(),
+        data_normalization
+        ])
+
+    data = Custom_Image_Dataset(os.path.join(desktop_path, 'image_net_images/{}'.format(file_num)), transform)
+
+    dataloader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    return dataloader
+
+
 def load(dataset, run_local, batch_size, num_workers):
     if dataset == 'cifar10':
         return cifar10_loader(run_local, batch_size, num_workers)
@@ -143,6 +162,9 @@ def load(dataset, run_local, batch_size, num_workers):
         return sbu_loader(run_local, batch_size, num_workers)
     elif dataset == 'custom':
         return custom_loader(run_local, batch_size, num_workers)
+    elif dataset == 'pre_custom':
+        return pre_custom_loader(run_local, batch_size, num_workers)
+
     elif dataset == 'flicker':
         return flicker_loader(run_local)
 # dataloader.py

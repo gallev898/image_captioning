@@ -1,3 +1,11 @@
+
+import sys
+
+
+sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
+sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+
+
 import json
 import os
 
@@ -47,44 +55,49 @@ def get_models(model_path):
     return encoder, decoder
 
 
-def get_word_map(map_file=None):
+def get_word_map(run_local=True, map_file=None):
 
-    file = word_map_file
-    if not None == map_file:
-        file = map_file
+    if run_local:
+        file = word_map_file
+        if not None == map_file:
+            file = map_file
+    else:
+        p ='/yoav_stg/gshalev/image_captioning/output_folder'
+        file = os.path.join(p,'WORDMAP_' + data_name + '.json')
 
+    print('Loading word map from: {}'.format(file))
     with open(file, 'r') as j:
         word_map = json.load(j)
     rev_word_map = {v: k for k, v in word_map.items()}
 
     return word_map, rev_word_map
 
-
-def encode(encoder, image, k, word_map):
-
-    # Encode - return the output of resnet as 2048 channels
-    encoder_out = encoder(image)  # (1, enc_image_size, enc_image_size, encoder_dim)
-    enc_image_size = encoder_out.size(1)
-    encoder_dim = encoder_out.size(3)
-
-    # Flatten encoding
-    encoder_out = encoder_out.view(1, -1, encoder_dim)  # (1, num_pixels, encoder_dim)
-    num_pixels = encoder_out.size(1) # num of pixels in each
-
-    # We'll treat the problem as having a batch size of k
-    encoder_out = encoder_out.expand(k, num_pixels, encoder_dim)  # (k, num_pixels, encoder_dim)
-
-    # Tensor to store top k previous words at each step; now they're just <start>
-    k_prev_words = torch.LongTensor([[word_map['<start>']]] * k).to(device)  # (k, 1)
-
-    # Tensor to store top k sequences; now they're just <start>
-    seqs = k_prev_words  # (k, 1)
-    seqs_scores = torch.FloatTensor([[0.]] * k).to(device)
-
-    # Tensor to store top k sequences' scores; now they're just 0
-    top_k_scores = torch.zeros(k, 1).to(device)  # (k, 1)
-
-    # Tensor to store top k sequences' alphas; now they're just 1s
-    seqs_alpha = torch.ones(k, 1, enc_image_size, enc_image_size).to(device) # NOTICE: for visualization
-
-    return encoder_out, enc_image_size, k_prev_words, seqs, seqs_scores, top_k_scores, seqs_alpha
+#
+# def encode(encoder, image, k, word_map):
+#
+#     # Encode - return the output of resnet as 2048 channels
+#     encoder_out = encoder(image)  # (1, enc_image_size, enc_image_size, encoder_dim)
+#     enc_image_size = encoder_out.size(1)
+#     encoder_dim = encoder_out.size(3)
+#
+#     # Flatten encoding
+#     encoder_out = encoder_out.view(1, -1, encoder_dim)  # (1, num_pixels, encoder_dim)
+#     num_pixels = encoder_out.size(1) # num of pixels in each
+#
+#     # We'll treat the problem as having a batch size of k
+#     encoder_out = encoder_out.expand(k, num_pixels, encoder_dim)  # (k, num_pixels, encoder_dim)
+#
+#     # Tensor to store top k previous words at each step; now they're just <start>
+#     k_prev_words = torch.LongTensor([[word_map['<start>']]] * k).to(device)  # (k, 1)
+#
+#     # Tensor to store top k sequences; now they're just <start>
+#     seqs = k_prev_words  # (k, 1)
+#     seqs_scores = torch.FloatTensor([[0.]] * k).to(device)
+#
+#     # Tensor to store top k sequences' scores; now they're just 0
+#     top_k_scores = torch.zeros(k, 1).to(device)  # (k, 1)
+#
+#     # Tensor to store top k sequences' alphas; now they're just 1s
+#     seqs_alpha = torch.ones(k, 1, enc_image_size, enc_image_size).to(device) # NOTICE: for visualization
+#
+#     return encoder_out, enc_image_size, k_prev_words, seqs, seqs_scores, top_k_scores, seqs_alpha

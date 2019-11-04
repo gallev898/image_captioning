@@ -1,17 +1,22 @@
 import sys
+
+
+sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 
-import torch
-from torch.utils.data import Dataset
+import os
 import h5py
 import json
-import os
+import torch
+
+from torch.utils.data import Dataset
 
 
 class CaptionDataset(Dataset):
     """
     A PyTorch Dataset class to be used in a PyTorch DataLoader to create batches.
     """
+
 
     def __init__(self, data_folder, data_name, split, transform=None):
         """
@@ -44,6 +49,7 @@ class CaptionDataset(Dataset):
         # Total number of datapoints
         self.dataset_size = len(self.captions)
 
+
     def __getitem__(self, i):
         # Remember, the Nth caption corresponds to the (N // captions_per_image)th image
         img = torch.FloatTensor(self.imgs[i // self.cpi] / 255.)
@@ -61,6 +67,7 @@ class CaptionDataset(Dataset):
             all_captions = torch.LongTensor(
                 self.captions[((i // self.cpi) * self.cpi):(((i // self.cpi) * self.cpi) + self.cpi)])
             return img, caption, caplen, all_captions
+
 
     def __len__(self):
         return self.dataset_size

@@ -1,14 +1,21 @@
-from collections import defaultdict
+import sys
+
+
+sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
+sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+
 from PIL import Image
 from six.moves import html_parser
-
-import glob
-import os
+from collections import defaultdict
 from torchvision.datasets import VisionDataset
+
+import os
+import glob
 
 
 class Flickr8kParser(html_parser.HTMLParser):
     """Parser for extracting captions from the Flickr8k dataset web page."""
+
 
     def __init__(self, root):
         super(Flickr8kParser, self).__init__()
@@ -23,17 +30,20 @@ class Flickr8kParser(html_parser.HTMLParser):
         self.current_tag = None
         self.current_img = None
 
+
     def handle_starttag(self, tag, attrs):
         self.current_tag = tag
 
         if tag == 'table':
             self.in_table = True
 
+
     def handle_endtag(self, tag):
         self.current_tag = None
 
         if tag == 'table':
             self.in_table = False
+
 
     def handle_data(self, data):
         if self.in_table:
@@ -62,6 +72,7 @@ class Flickr8k(VisionDataset):
             target and transforms it.
     """
 
+
     def __init__(self, root, ann_file, transform=None, target_transform=None):
         super(Flickr8k, self).__init__(root, transform=transform,
                                        target_transform=target_transform)
@@ -74,6 +85,7 @@ class Flickr8k(VisionDataset):
         self.annotations = parser.annotations
 
         self.ids = list(sorted(self.annotations.keys()))
+
 
     def __getitem__(self, index):
         """
@@ -102,7 +114,6 @@ class Flickr8k(VisionDataset):
         return len(self.ids)
 
 
-
 class Flickr30k(VisionDataset):
     """`Flickr30k Entities <http://web.engr.illinois.edu/~bplumme2/Flickr30kEntities/>`_ Dataset.
 
@@ -114,6 +125,7 @@ class Flickr30k(VisionDataset):
         target_transform (callable, optional): A function/transform that takes in the
             target and transforms it.
     """
+
 
     def __init__(self, root, ann_file, transform=None, target_transform=None):
         super(Flickr30k, self).__init__(root, transform=transform,
@@ -128,6 +140,7 @@ class Flickr30k(VisionDataset):
                 self.annotations[img_id[:-2]].append(caption)
 
         self.ids = list(sorted(self.annotations.keys()))
+
 
     def __getitem__(self, index):
         """
@@ -155,6 +168,4 @@ class Flickr30k(VisionDataset):
 
     def __len__(self):
         return len(self.ids)
-
-
 # flickr_parser.py

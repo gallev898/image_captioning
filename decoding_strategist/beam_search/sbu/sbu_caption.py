@@ -9,6 +9,7 @@ from decoding_strategist.decoding_strategist_utils import *
 from decoding_strategist.beam_search.beam_search_pack_utils import *
 
 import torch
+import string
 import en_core_web_sm
 
 import numpy as np
@@ -17,16 +18,8 @@ import numpy as np
 args = get_args()
 
 
-def caption_image(encoder, decoder, image_path, word_map, beam_size=3):
-    image = image_path
-
-    vocab_size = len(word_map)
-
-    return beam_search_decode(encoder, image, beam_size, word_map, decoder, vocab_size)
-
-
-def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_name, smooth=True):
-    image = image_path.squeeze(0)
+def visualize_att(image, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_name, smooth=True):
+    image = image.squeeze(0)
     image = image.numpy()
 
     image = image.transpose((1, 2, 0))
@@ -50,23 +43,19 @@ def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, sa
     top_seq_total_scors_exp = np.exp(top_seq_total_scors)
 
     return visualization(image, alphas, words, pos, top_seq_total_scors, top_seq_total_scors_exp, smooth, save_dir,
-                         image_name)
+                         image_id)
 
 
-def run(encoder, decoder, word_map, rev_word_map, save_dir, image_data):
-    image = image_data[0]
-    image_name = ' '.join(image_data[1]).split()[0:3]
-
-    seq, alphas, top_seq_total_scors, seq_sum, logits_list = caption_image(encoder,
-                                                                           decoder,
-                                                                           image,
-                                                                           word_map,
-                                                                           args.beam_size)
+def run(encoder, decoder, word_map, rev_word_map, save_dir, image, image_title, image_id):
+    seq, alphas, top_seq_total_scors, seq_sum, logits_list = beam_search_decode(encoder, image, args.beam_size,
+                                                                                word_map, decoder)
 
     alphas = torch.FloatTensor(alphas)
 
-    visualize_att(image, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_name, args.smooth)
+    visualize_att(image, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_title, args.smooth)
 
+    f = open(os.path.join(save_dir, 'seq_sum.txt'), 'a+')
+    f.write('seq_sum: {}    for image id: {}    with caption: {}\n'.format(seq_sum, image_id, image_title))
     print('seq_sum: {}'.format(seq_sum))
 
 
@@ -83,4 +72,11 @@ if __name__ == '__main__':
     dataloader = load('sbu', args.run_local, 1, 1)
 
     for ind, image_data in enumerate(dataloader):
-        run(encoder, decoder, word_map, rev_word_map, save_dir, image_data)
+        image = image_data[0]
+
+        translator = str.maketrans('', '', string.punctuation)
+        image_title = image_data[1][0].translate(translator)
+        image_id = dataloader.dataset.photos[ind]
+
+        # image_title = image_data[1][0].strip(string.punctuation)
+        run(encoder, decoder, word_map, rev_word_map, save_dir, image, image_title, image_id)

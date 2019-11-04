@@ -20,14 +20,6 @@ import torchvision.transforms as transforms
 args = get_args()
 
 
-def caption_image(encoder, decoder, image_path, word_map, beam_size=3):
-    image = image_path
-
-    vocab_size = len(word_map)
-
-    return beam_search_decode(encoder, image, beam_size, word_map, decoder, vocab_size)
-
-
 def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_name, smooth=True):
     image = image_path.squeeze(0)
     image = image.numpy()
@@ -57,16 +49,15 @@ def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, sa
 
 
 def run(encoder, decoder, word_map, rev_word_map, save_dir, image_path, image_name):
-    seq, alphas, top_seq_total_scors, seq_sum, logits_list = caption_image(encoder,
-                                                                           decoder,
-                                                                           image_path,
-                                                                           word_map,
-                                                                           args.beam_size)
+    seq, alphas, top_seq_total_scors, seq_sum, logits_list = beam_search_decode(encoder, image, args.beam_size,
+                                                                                word_map, decoder)
 
     alphas = torch.FloatTensor(alphas)
 
     visualize_att(image_path[0], seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_name, args.smooth)
 
+    f = open(os.path.join(save_dir, 'seq_sum.txt'), 'a+')
+    f.write('seq_sum: {}    for image with caption: {}\n'.format(seq_sum, image_name))
     print('seq_sum: {}'.format(seq_sum))
 
 

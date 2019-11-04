@@ -1,13 +1,12 @@
 import sys
 
-from decoding_strategist.decoding_strategist_utils import *
-
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 
 from PIL import Image
 from scipy.misc import imread, imresize
+from decoding_strategist.decoding_strategist_utils import *
 from decoding_strategist.beam_search.beam_search_pack_utils import *
 
 import os
@@ -20,11 +19,6 @@ import torchvision.transforms as transforms
 
 args = get_args()
 
-
-def caption_image(encoder, decoder, image, word_map, beam_size=3):
-    vocab_size = len(word_map)
-
-    return beam_search_decode(encoder, image.unsqueeze(0), beam_size, word_map, decoder, vocab_size)
 
 
 def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_name, smooth=True):
@@ -43,8 +37,7 @@ def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, sa
                          image_name)
 
 
-def run(encoder, decoder, word_map, rev_word_map, save_dir, image_data):
-    image_path, image_name = image_data[0], image_data[1]
+def run(encoder, decoder, word_map, rev_word_map, save_dir, image_path, image_title):
 
     img = imread(image_path)
     img = imresize(img, (256, 256))
@@ -56,23 +49,22 @@ def run(encoder, decoder, word_map, rev_word_map, save_dir, image_data):
     transform = transforms.Compose([data_normalization])
     image = transform(img)  # (3, 256, 256)
 
-    seq, alphas, top_seq_total_scors, seq_sum, logits_list = caption_image(encoder,
-                                                                           decoder,
-                                                                           image,
-                                                                           word_map,
-                                                                           args.beam_size)
+    seq, alphas, top_seq_total_scors, seq_sum, logits_list = beam_search_decode(encoder, image.unsqueeze(0), args.beam_size, word_map, decoder)
 
     alphas = torch.FloatTensor(alphas)
 
     image = Image.open(image_path)
     image = image.resize([14 * 24, 14 * 24], Image.LANCZOS)
 
-    visualize_att(image, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_name, args.smooth)
+    visualize_att(image, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_title, args.smooth)
 
+    f = open(os.path.join(save_dir, 'seq_sum.txt'), 'a+')
+    f.write('seq_sum: {}    for image id: {}\n'.format(seq_sum, image_title))
     print('seq_sum: {}'.format(seq_sum))
 
 
 if __name__ == '__main__':
+
     save_dir_name = '{}_{}'.format(args.beam_size, args.save_dir_name)
 
     model_path, save_dir = get_model_path_and_save_path(args, save_dir_name)
@@ -89,4 +81,4 @@ if __name__ == '__main__':
 
     for ind, filename in enumerate(os.listdir(dir)):
         img_path = os.path.join(dir, filename)
-        run(encoder, decoder, word_map, rev_word_map, save_dir, (img_path, filename))
+        run(encoder, decoder, word_map, rev_word_map, save_dir, img_path, filename)

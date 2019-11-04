@@ -1,4 +1,10 @@
-from __future__ import print_function, division
+import sys
+
+
+sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
+sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+
+# from __future__ import print_function, division
 import os
 
 import torch
