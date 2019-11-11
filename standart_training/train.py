@@ -1,10 +1,14 @@
 import sys
 
-from utils import data_normalization
 
 
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
+sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 
+# sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+from utils import *
+
+# wandb login a8c4526db3e8aa11d7b2674d7c257c58313b45ca
 import time
 import argparse
 import torch.optim
@@ -21,18 +25,20 @@ from dataset_loader.datasets import *
 from torch.nn.utils.rnn import pack_padded_sequence
 from nltk.translate.bleu_score import corpus_bleu
 
+data_normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-parser = argparse.ArgumentParser(description='train')
-parser.add_argument('--runname', type=str)
-parser.add_argument('--cuda', type=int, default=0)
-parser.add_argument('--checkpoint', default=None, type=str)
-parser.add_argument('--fine_tune_encoder', default=False, action='store_true')
-parser.add_argument('--debug', default=False, action='store_true')
-parser.add_argument('--fine_tune_epochs', default=-1, type=int)
-
-parser.add_argument('--run_local', default=False, action='store_true')
-parser.add_argument('--batch_size', default=32, type=int)
-args = parser.parse_args()
+# parser = argparse.ArgumentParser(description='train')
+# parser.add_argument('--runname', type=str)
+# parser.add_argument('--cuda', type=int, default=0)
+# parser.add_argument('--checkpoint', default=None, type=str)
+# parser.add_argument('--fine_tune_encoder', default=False, action='store_true')
+# parser.add_argument('--debug', default=False, action='store_true')
+# parser.add_argument('--fine_tune_epochs', default=-1, type=int)
+#
+# parser.add_argument('--run_local', default=False, action='store_true')
+# parser.add_argument('--batch_size', default=32, type=int)
+# args = parser.parse_args()
+args = get_args()
 
 if not args.run_local:
     import wandb
@@ -75,7 +81,14 @@ def main():
         raise Exception('if "fine_tune_encoder" == true you must also specify "fine_tune_epochs" != -1')
 
     # Read word map
-    word_map_file = os.path.join(data_folder, 'WORDMAP_' + data_name + '.json')
+    if not args.run_local:
+        data_f = '/yoav_stg/gshalev/image_captioning/output_folder'
+    else:
+        data_f = data_folder
+
+    word_map_file = os.path.join(data_f, 'WORDMAP_' + data_name + '.json')
+    print('word_map_file: {}'.format(word_map_file))
+
     print('loading word map from path: {}'.format(word_map_file))
     with open(word_map_file, 'r') as j:
         word_map = json.load(j)
@@ -134,23 +147,23 @@ def main():
     criterion = nn.CrossEntropyLoss().to(device)
 
     # Custom dataloaders
-
     train_loader = torch.utils.data.DataLoader(
-        CaptionDataset(data_folder, data_name, 'TRAIN', transform=transforms.Compose([data_normalization])),
+        CaptionDataset(data_f, data_name, 'TRAIN', transform=transforms.Compose([data_normalization])),
         batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
 
     val_loader = torch.utils.data.DataLoader(
-        CaptionDataset(data_folder, data_name, 'VAL', transform=transforms.Compose([data_normalization])),
+        CaptionDataset(data_f, data_name, 'VAL', transform=transforms.Compose([data_normalization])),
         batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
 
     val_loader_for_val = torch.utils.data.DataLoader(
-        CaptionDataset(data_folder, data_name, 'VAL', transform=transforms.Compose([data_normalization])),
+        CaptionDataset(data_f, data_name, 'VAL', transform=transforms.Compose([data_normalization])),
         batch_size=1, shuffle=True, num_workers=workers, pin_memory=True)
 
     # Epochs
     print('starting epochs')
 
     for epoch in range(start_epoch, epochs):
+
         # Decay learning rate if there is no improvement for 8 consecutive epochs, and terminate training after 20
         if epochs_since_improvement == 20:
             print('break after : epochs_since_improvement == 20')
@@ -162,9 +175,20 @@ def main():
             encoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, encoder.parameters()),
                                                  lr=encoder_lr)
 
+            # Chane batch saize to 32
+            train_loader = torch.utils.data.DataLoader(
+                CaptionDataset(data_f, data_name, 'TRAIN', transform=transforms.Compose([data_normalization])),
+                batch_size=32, shuffle=True, num_workers=workers, pin_memory=True)
+
+            val_loader = torch.utils.data.DataLoader(
+                CaptionDataset(data_f, data_name, 'VAL', transform=transforms.Compose([data_normalization])),
+                batch_size=32, shuffle=True, num_workers=workers, pin_memory=True)
+
+
         if epochs_since_improvement > 0 and epochs_since_improvement % 8 == 0:
             print('adjust lr afetr : epochs_since_improvement > 0 and epochs_since_improvement % 8 == 0')
             adjust_learning_rate(decoder_optimizer, 0.8)
+
             if args.checkpoint is not None:
                 adjust_learning_rate(encoder_optimizer, 0.8)
             elif args.fine_tune_encoder and epoch > args.fine_tune_epochs:
@@ -189,6 +213,7 @@ def main():
                                 criterion=criterion,
                                 rev_word_map=rev_word_map)
 
+        print('9999999999999- recent blue {}'.format(recent_bleu4))
         print('--------------3333333333-----------Start val without teacher forcing----------epoch-{}'.format(epoch))
         caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map)
         print('!@#!@!#!#@!#@!#@ DONE WITH TRAIN VAL AND VAL WITHOUT TEACHER FORCING FOR EPOCH :{}'.format(epoch))

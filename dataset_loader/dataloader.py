@@ -114,7 +114,12 @@ def custom_loader(run_local, batch_size, num_workers):
         data_normalization
         ])
 
-    data = Custom_Image_Dataset(os.path.join(desktop_path, 'custom_images'), transform)
+    if run_local:
+        path = desktop_path
+    else:
+        path = '/yoav_stg/gshalev/semantic_labeling'
+
+    data = Custom_Image_Dataset(os.path.join(path, 'custom_images'), transform)
 
     dataloader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 

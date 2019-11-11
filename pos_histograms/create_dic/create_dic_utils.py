@@ -37,6 +37,11 @@ def get_model_path_and_save_dir(args, save_dir_name):
         os.mkdir(save_dir)
         print('created dir: {}'.format(save_dir))
 
+    save_dir = os.path.join(save_dir, args.model)
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
+        print('created dir: {}'.format(save_dir))
+
     print('model path: {}'.format(model_path))
     print('save dir: {}'.format(save_dir))
     return model_path, save_dir
@@ -48,7 +53,7 @@ def get_args():
     parser.add_argument('--run_local', default=False, action='store_true')
     parser.add_argument('--debug', default=False, action='store_true')
     parser.add_argument('--data', default='random', type=str)
-    parser.add_argument('--beam_size', default=5, type=int)
+    parser.add_argument('--beam_size', default=10, type=int)
     parser.add_argument('--top_k', default=0, type=int)
     parser.add_argument('--top_p', default=0.0, type=float)
     args = parser.parse_args()

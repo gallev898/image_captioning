@@ -64,8 +64,8 @@ if __name__ == '__main__':
     encoder, decoder = get_models(model_path)
     word_map, rev_word_map = get_word_map()
 
-    dataloader = pre_custom_loader(1, 1, 't')
-    # dataloader = load('custom', args.run_local, 1, 1)
+    # dataloader = pre_custom_loader(1, 1, 't')
+    dataloader = load('custom', args.run_local, 1, 1)
 
     for ind, image_data in enumerate(dataloader):
         image = image_data[0]

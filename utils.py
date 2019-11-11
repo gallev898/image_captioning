@@ -3,7 +3,8 @@ import sys
 
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
+# sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 
 
 import json
@@ -25,12 +26,17 @@ def get_model_path_and_save_path(args, save_dir_name):
 
     if args.run_local:
         desktop_path = os.path.join(os.path.join(os.path.expanduser('~')), 'Desktop')
+        desktop_path = os.path.join(desktop_path, 'trained_models')
         model_path = os.path.join(desktop_path, os.path.join(args.model, filename))
         save_dir = "GIFs"
     else:
         model_path = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, filename)
         save_dir = "/yoav_stg/gshalev/image_captioning/{}/GIFs".format(args.model)
 
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
+
+    save_dir = os.path.join(save_dir, args.model)
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
 

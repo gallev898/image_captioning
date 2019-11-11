@@ -1,15 +1,21 @@
 import sys
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
+sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
+# sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 
 import os
-import numpy as np
 import h5py
 import json
 import torch
-from scipy.misc import imread, imresize
+import argparse
+
+import numpy as np
+
 from tqdm import tqdm
-from collections import Counter
 from random import seed, choice, sample
+from scipy.misc import imread, imresize
+from collections import Counter
 
 data_folder = '../output_folder'  # folder with data files saved by create_input_files.py
 data_name = 'coco_5_cap_per_img_5_min_word_freq'  # base name shared by data files
@@ -314,5 +320,17 @@ def accuracy(scores, targets, k):
     correct_total = correct.view(-1).float().sum()  # 0D tensor
     return correct_total.item() * (100.0 / batch_size)
 
+def get_args():
+    parser = argparse.ArgumentParser(description='train')
+    parser.add_argument('--runname', type=str)
+    parser.add_argument('--cuda', type=int, default=0)
+    parser.add_argument('--checkpoint', default=None, type=str)
+    parser.add_argument('--fine_tune_encoder', default=False, action='store_true')
+    parser.add_argument('--debug', default=False, action='store_true')
+    parser.add_argument('--fine_tune_epochs', default=-1, type=int)
 
+    parser.add_argument('--run_local', default=False, action='store_true')
+    parser.add_argument('--batch_size', default=32, type=int)
+    args = parser.parse_args()
+    return args
 # utils.py

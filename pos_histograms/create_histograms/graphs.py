@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 if __name__ == '__main__':
-    dic_name = 'pos_dic_test_beam_1'
+    dic_name = 'pos_dic_custom_top_k_5'
 
     dic_type = 'top_k' if 'top_k' in dic_name else 'top_p' if 'top_p' in dic_name else 'beam' if 'beam' in dic_name else 'none'
     model_name = 'standart_training_with_fine_tune_after_13_epochs_run6'
@@ -13,6 +13,7 @@ if __name__ == '__main__':
 
     if not os.path.exists(model_name):
         os.mkdir(model_name)
+
     save_dir = os.path.join(model_name, dic_name)
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
