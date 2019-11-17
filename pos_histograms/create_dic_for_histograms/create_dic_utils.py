@@ -37,10 +37,11 @@ def get_model_path_and_save_dir(args, save_dir_name):
         os.mkdir(save_dir)
         print('created dir: {}'.format(save_dir))
 
-    save_dir = os.path.join(save_dir, args.model)
-    if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
-        print('created dir: {}'.format(save_dir))
+    if args.run_local:
+        save_dir = os.path.join(save_dir, args.model)
+        if not os.path.exists(save_dir):
+            os.mkdir(save_dir)
+            print('created dir: {}'.format(save_dir))
 
     print('model path: {}'.format(model_path))
     print('save dir: {}'.format(save_dir))

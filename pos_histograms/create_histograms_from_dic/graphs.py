@@ -4,11 +4,9 @@ import numpy as np
 import os
 
 if __name__ == '__main__':
-    dic_name = 'pos_dic_custom_top_k_5'
-
+    dic_name = 'pos_dic_test_beam_5'
     dic_type = 'top_k' if 'top_k' in dic_name else 'top_p' if 'top_p' in dic_name else 'beam' if 'beam' in dic_name else 'none'
-    model_name = 'standart_training_with_fine_tune_after_13_epochs_run6'
-
+    model_name = 'standart_training_with_fine_tune_after_13_epochs_run2'
     exp_or_prop = 'prop'if dic_type == 'top_k' or dic_type == 'top_p' else 'exp'
 
     if not os.path.exists(model_name):

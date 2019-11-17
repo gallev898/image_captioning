@@ -1,11 +1,14 @@
 import sys
+import PIL
+
 
 
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
 # sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+from dataset_loader.Pertubation import *
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-from decoding_strategist.beam_search.beam_search_pack_utils import beam_search_decode
-from pos_histograms.create_dic.create_dic_utils import *
+from decoding_strategist_visualizations.beam_search.beam_search_pack_utils import beam_search_decode
+from pos_histograms.create_dic_for_histograms.create_dic_utils import *
 from utils import *
 
 import os
@@ -118,6 +121,28 @@ if __name__ == '__main__':
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
+    if args.data == 'perturbed_test_fog':
+        data_path = '/yoav_stg/gshalev/image_captioning/output_folder'
+        coco_data = '../../output_folder' if args.run_local else data_path
+
+        test_loader = torch.utils.data.DataLoader(
+            CaptionDataset(coco_data, data_name, 'TEST', transform=transforms.Compose([
+                                                                                       transforms.ToPILImage(),
+                                                                                       ImgAugTransformFog(),
+                                                                                       lambda x: PIL.Image.fromarray(x),
+                                                                                       transforms.ToTensor(),
+                                                                                       data_normalization
+                                                                                       ])),
+            batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
+
+        for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
+            if i % 100 == 0 :
+                print('process : {}/{}'.format(i, len(test_loader)))
+            image = image.to(device)
+            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, args.beam_size)
+            if not None == seq_sum:
+                sentences_likelihood.append(seq_sum)
+
     if args.data == 'sbu':
         dataloader = load('sbu', args.run_local, 1, 1)
 
@@ -164,13 +189,6 @@ if __name__ == '__main__':
             _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
-
-    # if args.data == 'svhn':
-    #     _, dataloader, _ = load('svhn', args.run_local, 1, 1)
-    #
-    #     for i, data in tqdm(enumerate(dataloader)):
-    #         _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, data[0], word_map, rev_word_map, args.beam_size)
-    #         sentences_likelihood.append(seq_sum)
 
     dic_name = 'pos_dic_{}_beam_{}'.format(args.data, args.beam_size)
     print('dic name: {}'.format(dic_name))

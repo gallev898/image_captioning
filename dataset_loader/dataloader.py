@@ -169,7 +169,6 @@ def load(dataset, run_local, batch_size, num_workers):
         return custom_loader(run_local, batch_size, num_workers)
     elif dataset == 'pre_custom':
         return pre_custom_loader(run_local, batch_size, num_workers)
-
     elif dataset == 'flicker':
         return flicker_loader(run_local)
 # dataloader.py

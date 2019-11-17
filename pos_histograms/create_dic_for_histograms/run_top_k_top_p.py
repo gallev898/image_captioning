@@ -7,8 +7,8 @@ sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 
 from utils import *
-from decoding_strategist.top_k_top_p_captions.top_k_p_pack_utils import caption_image
-from pos_histograms.create_dic.create_dic_utils import *
+from decoding_strategist_visualizations.top_k_top_p_captions.top_k_p_pack_utils import caption_image
+from pos_histograms.create_dic_for_histograms.create_dic_utils import *
 
 
 import os
