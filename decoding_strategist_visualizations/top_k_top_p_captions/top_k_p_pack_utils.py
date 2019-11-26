@@ -1,13 +1,10 @@
-
 import sys
 
 
-sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
-# sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 
 import os
-
 import torch
 import torch.nn.functional as F
 
@@ -51,7 +48,6 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
 
 
 def caption_image(encoder, decoder, image, word_map, top_k, top_p):
-
     # Here is how to use this function for top-p sampling
     temperature = 1.0
 
@@ -109,5 +105,4 @@ def caption_image(encoder, decoder, image, word_map, top_k, top_p):
     seqs_prop = [x.item() for x in seqs_prop]
     seqs_logits = [x.item() for x in seqs_logits]
     return seqs, seqs_alpha, seqs_prop, seqs_logits
-
 # top_k_p_pack_utils.py

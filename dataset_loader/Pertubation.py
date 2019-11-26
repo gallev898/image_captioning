@@ -36,7 +36,7 @@ class ImgAugTransformSnow:
     def __init__(self):
         self.aug = iaa.Sequential([
             #iaa.Resize(32),
-            iaa.Snowflakes()
+            iaa.Snowflakes(density=(0.5, 0.01))
             ])
 
 

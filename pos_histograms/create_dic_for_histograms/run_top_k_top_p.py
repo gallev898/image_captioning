@@ -1,15 +1,12 @@
 import sys
 
 
-
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
-# sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 
-from utils import *
 from decoding_strategist_visualizations.top_k_top_p_captions.top_k_p_pack_utils import caption_image
+from utils import *
 from pos_histograms.create_dic_for_histograms.create_dic_utils import *
-
 
 import os
 import torch
@@ -31,7 +28,6 @@ top_p = args.top_p  # NOTICE: double
 
 
 def caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map):
-
     seq, seqs_alpha, seqs_prop, seqs_logits = caption_image(encoder, decoder, image, word_map, top_k, top_p)
 
     words = [rev_word_map[ind] for ind in seq]
@@ -104,7 +100,6 @@ def caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map):
     return seq, seqs_alpha, seqs_prop, sen_likelihood
 
 
-
 if __name__ == '__main__':
     print('Starting top K: {}'.format(args.top_k) if args.top_k > 0 else 'Starting top_p: {}'.format(
         args.top_p) if args.top_p > 0 else 'GOING TO BREAK')
@@ -118,6 +113,7 @@ if __name__ == '__main__':
     print('create pos dic for {} data'.format(args.data))
 
     if args.data == 'test':
+        print('args.data = {}'.format(args.data))
         p = '/yoav_stg/gshalev/image_captioning/output_folder'
         coco_data = '../../output_folder' if args.run_local else p
 
@@ -125,10 +121,12 @@ if __name__ == '__main__':
             CaptionDataset(coco_data, data_name, 'TEST', transform=transforms.Compose([data_normalization])),
             batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
 
+        print('lev test_loader: {}'.format(len(test_loader)))
         for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
+            print(i)
             image = image.to(device)
             _, _, _, sen_likelihood = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map)
-            if not None  == sen_likelihood:
+            if not None == sen_likelihood:
                 sentences_likelihood.append(sen_likelihood)
 
     if args.data == 'sbu':
@@ -175,9 +173,11 @@ if __name__ == '__main__':
 
         for i, data in enumerate(dataloader):
             image = data[0].to(device)
-
+            if image.shape[1] != 3:
+                continue
             _, _, _, sen_likelihood = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map)
-            sentences_likelihood.append(sen_likelihood)
+            if not None == sen_likelihood:
+                sentences_likelihood.append(sen_likelihood)
 
     dic_name = 'pos_dic_{}_{}_{}'.format(args.data, 'top_k' if args.top_k > 0 else 'top_p',
                                          args.top_k if args.top_k > 0 else args.top_p)
@@ -190,5 +190,4 @@ if __name__ == '__main__':
                 'noun_phrase_sum_of_log_prop': noun_phrase_sum_of_log_prop,
                 'sentence_likelihood': sentences_likelihood},
                save_data_path)
-
 # run_top_k_top_p.py

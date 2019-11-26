@@ -4,22 +4,24 @@ from dominate.tags import *
 import os
 
 
-model = 'standart_training_with_fine_tune_after_13_epochs_run6'
-pos_dic_perturbed_test_fog_beam_5 = glob.glob(os.path.join(model, 'pos_dic_custom_beam_5/*.png'))
-pos_dic_test_beam_5 = glob.glob(os.path.join(model, 'pos_dic_test_beam_5/*.png'))
+model = 'run_7'
+custom_model_name = 'pos_dic_custom_beam_10'
+test_model_name = 'pos_dic_test_beam_10'
+pos_dic_custom = glob.glob(os.path.join(model, '{}/*.png'.format(custom_model_name)))
+pos_dic_test = glob.glob(os.path.join(model, '{}/*.png'.format(test_model_name)))
 
 with document(title='Photos') as doc:
     # h1('Photos')
     with table().add(tbody()):
         l = tr()
-        l += td('pos_dic_perturbed_test_fog_beam_5')
+        l += td(custom_model_name)
         with l:
-            l.add(td('pos_dic_test_beam_5'))
+            l.add(td(test_model_name))
 
         dic = dict()
-        for path1 in pos_dic_perturbed_test_fog_beam_5:
+        for path1 in pos_dic_custom:
             png = path1[path1.rindex('/') + 1:]
-            x_ = [x for x in pos_dic_test_beam_5 if png in x]
+            x_ = [x for x in pos_dic_test if png in x]
             if len(x_) > 0:
                 dic[path1] = x_[0]
 

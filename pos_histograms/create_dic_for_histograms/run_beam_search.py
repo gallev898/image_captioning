@@ -1,12 +1,11 @@
 import sys
-import PIL
-
 
 
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
-# sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
-from dataset_loader.Pertubation import *
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
+import PIL
+
+from dataset_loader.Pertubation import *
 from decoding_strategist_visualizations.beam_search.beam_search_pack_utils import beam_search_decode
 from pos_histograms.create_dic_for_histograms.create_dic_utils import *
 from utils import *
@@ -22,6 +21,7 @@ import torchvision.transforms as transforms
 from tqdm import *
 from dataset_loader.datasets import CaptionDataset
 from dataset_loader.dataloader import load
+
 
 args = get_args()
 
@@ -101,7 +101,6 @@ if __name__ == '__main__':
     print('Strating beam search : {}'.format(args.beam_size))
     model_path, save_dir = get_model_path_and_save_dir(args, 'pos_dic')
 
-
     encoder, decoder = get_models(model_path)
     word_map, rev_word_map = get_word_map(args.run_local, '../../output_folder/WORDMAP_' + data_name + '.json')
 
@@ -117,7 +116,8 @@ if __name__ == '__main__':
 
         for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
             image = image.to(device)
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, args.beam_size)
+            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+                                                         args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
@@ -127,19 +127,46 @@ if __name__ == '__main__':
 
         test_loader = torch.utils.data.DataLoader(
             CaptionDataset(coco_data, data_name, 'TEST', transform=transforms.Compose([
-                                                                                       transforms.ToPILImage(),
-                                                                                       ImgAugTransformFog(),
-                                                                                       lambda x: PIL.Image.fromarray(x),
-                                                                                       transforms.ToTensor(),
-                                                                                       data_normalization
-                                                                                       ])),
+                transforms.ToPILImage(),
+                ImgAugTransformFog(),
+                lambda x: PIL.Image.fromarray(x),
+                transforms.ToTensor(),
+                data_normalization
+                ])),
             batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
 
         for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
-            if i % 100 == 0 :
+            if i % 100 == 0:
                 print('process : {}/{}'.format(i, len(test_loader)))
             image = image.to(device)
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, args.beam_size)
+            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+                                                         args.beam_size)
+            if not None == seq_sum:
+                sentences_likelihood.append(seq_sum)
+
+    if args.data == 'perturbed_test_snow':
+        data_path = '/yoav_stg/gshalev/image_captioning/output_folder'
+        coco_data = '../../output_folder' if args.run_local else data_path
+
+        transform = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.Resize((336, 336)),
+            ImgAugTransformSnow(),
+            lambda x: PIL.Image.fromarray(x),
+            transforms.ToTensor(),
+            data_normalization
+            ])
+
+        test_loader = torch.utils.data.DataLoader(
+            CaptionDataset(coco_data, data_name, 'TEST', transform=transform),
+            batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
+
+        for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
+            if i % 100 == 0:
+                print('process : {}/{}'.format(i, len(test_loader)))
+            image = image.to(device)
+            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+                                                         args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
@@ -147,7 +174,8 @@ if __name__ == '__main__':
         dataloader = load('sbu', args.run_local, 1, 1)
 
         for i, data in tqdm(enumerate(dataloader)):
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, data[0], word_map, rev_word_map, args.beam_size)
+            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, data[0], word_map, rev_word_map,
+                                                         args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
@@ -155,18 +183,21 @@ if __name__ == '__main__':
         dataloader = load('flicker', args.run_local, 1, 1)
 
         for i, data in tqdm(enumerate(dataloader)):
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, data[0], word_map, rev_word_map, args.beam_size)
+            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, data[0], word_map, rev_word_map,
+                                                         args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
     if args.data == 'custom':
-
         dataloader = load('custom', args.run_local, 1, 1)
 
         for i, data in tqdm(enumerate(dataloader)):
             image = data[0].to(device)
-
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, args.beam_size)
+            if image.shape[1] != 3:
+                continue
+            print('########## image shape:{}'.format(image.shape))
+            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+                                                         args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
@@ -186,7 +217,8 @@ if __name__ == '__main__':
             # Encode
             image = image.unsqueeze(0)  # (1, 3, 256, 256)
 
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, args.beam_size)
+            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+                                                         args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
@@ -200,5 +232,4 @@ if __name__ == '__main__':
                 'noun_phrase_sum_of_log_prop': noun_phrase_sum_of_log_prop,
                 'sentence_likelihood': sentences_likelihood},
                save_data_path)
-
 # run_beam_search.py
