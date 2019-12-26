@@ -111,7 +111,7 @@ def custom_loader(run_local, batch_size, num_workers):
     transform = transforms.Compose([
         transforms.Resize(256),
         transforms.ToTensor(),
-        #data_normalization
+        data_normalization
         ])
 
     if run_local:
