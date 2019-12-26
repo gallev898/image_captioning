@@ -1,6 +1,6 @@
 import sys
 
-from decoding_strategist.decoding_strategist_utils import *
+from decoding_strategist_visualizations.decoding_strategist_utils import *
 
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
@@ -8,7 +8,7 @@ sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 
 from utils import *
 from dataset_loader.dataloader import load
-from decoding_strategist.top_k_top_p_captions.top_k_p_pack_utils import *
+from decoding_strategist_visualizations.top_k_top_p_captions.top_k_p_pack_utils import *
 
 import torch
 import argparse
@@ -61,8 +61,8 @@ def run(encoder, decoder, word_map, rev_word_map, save_dir, top_k, top_p, image,
 
 
 if __name__ == '__main__':
-    top_k = 0  # NOTICE: inr
-    top_p = 0.8  # NOTICE: double
+    top_k = 5  # NOTICE: inr
+    top_p = 0  # NOTICE: double
 
     model_path, save_dir = get_model_path_and_save_path(args, 'top_k_{}'.format(top_k)
     if top_k > 0 else 'top_p_{}'.format(top_p))

@@ -2,7 +2,7 @@ import sys
 
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
 
 import argparse
 
@@ -160,6 +160,7 @@ def beam_search_decode(encoder, image, beam_size, word_map, decoder):
     alphas = complete_seqs_alpha[i]
     logits_list = complete_logits_list[i][1:-1]  # NOTICE
 
+    print(seq_sum)
     return seq, alphas, top_seq_total_scors, seq_sum, logits_list
 
 
