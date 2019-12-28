@@ -2,7 +2,7 @@ import sys
 
 
 
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 from utils import *
 import torch.backends.cudnn as cudnn

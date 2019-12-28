@@ -5,7 +5,7 @@ from dataset_loader.datasets import CaptionDataset
 import PIL
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 from utils import *
 from decoding_strategist.decoding_strategist_utils import *

@@ -2,7 +2,7 @@ import sys
 
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 import argparse
 
@@ -171,7 +171,7 @@ def get_args():
     parser.add_argument('--model', type=str)
     parser.add_argument('--save_dir_name', type=str, default='beam_size')
     parser.add_argument('--run_local', default=False, action='store_true')
-    parser.add_argument('--limit_ex', type=int, default=5)
+    parser.add_argument('--limit_ex', type=int, default=10)
     parser.add_argument('--beam_size', default=5, type=int)
     parser.add_argument('--dont_smooth', dest='smooth', action='store_false', help='do not smooth alpha overlay')
     args = parser.parse_args()

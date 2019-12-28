@@ -1,7 +1,7 @@
 import sys
 
 
-sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 
 from decoding_strategist_visualizations.top_k_top_p_captions.top_k_p_pack_utils import caption_image
@@ -22,6 +22,8 @@ from dataset_loader.dataloader import load
 
 
 args = get_args()
+device = torch.device("cuda:{}".format(args.cuda) if torch.cuda.is_available() else "cpu")
+
 
 top_k = args.top_k  # NOTICE: int
 top_p = args.top_p  # NOTICE: double
@@ -113,6 +115,8 @@ if __name__ == '__main__':
     print('create pos dic for {} data'.format(args.data))
 
     if args.data == 'test':
+        print('using cuda: {}',format(device))
+
         print('args.data = {}'.format(args.data))
         p = '/yoav_stg/gshalev/image_captioning/output_folder'
         coco_data = '../../output_folder' if args.run_local else p
@@ -150,7 +154,9 @@ if __name__ == '__main__':
             sentences_likelihood.append(sen_likelihood)
 
     if args.data == 'random':
-        for i in tqdm(range(5)):
+        print('using cuda: {}',format(device))
+
+        for i in tqdm(range(args.random_range)):
             img1 = np.random.uniform(low=0., high=255., size=(256, 256, 3))
             img1 = np.uint8(img1)
             img = img1
@@ -169,6 +175,8 @@ if __name__ == '__main__':
             sentences_likelihood.append(sen_likelihood)
 
     if args.data == 'custom':
+        print('using cuda: {}',format(device))
+
         dataloader = load('custom', args.run_local, 1, 1)
 
         for i, data in enumerate(dataloader):

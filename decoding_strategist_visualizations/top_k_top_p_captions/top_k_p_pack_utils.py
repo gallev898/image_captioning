@@ -1,7 +1,7 @@
 import sys
 
 
-sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 
 import os

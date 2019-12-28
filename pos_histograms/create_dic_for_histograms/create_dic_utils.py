@@ -2,7 +2,7 @@
 import sys
 
 
-sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 # sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 
@@ -55,6 +55,8 @@ def get_args():
     parser.add_argument('--debug', default=False, action='store_true')
     parser.add_argument('--data', default='random', type=str)
     parser.add_argument('--beam_size', default=10, type=int)
+    parser.add_argument('--cuda', default=0, type=int)
+    parser.add_argument('--random_range', default=5, type=int)
     parser.add_argument('--top_k', default=0, type=int)
     parser.add_argument('--top_p', default=0.0, type=float)
     args = parser.parse_args()

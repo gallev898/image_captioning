@@ -4,7 +4,7 @@ from decoding_strategist.top_k_top_p_captions.top_k_p_pack_utils import caption_
 
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 from PIL import Image
 from scipy.misc import imread, imresize

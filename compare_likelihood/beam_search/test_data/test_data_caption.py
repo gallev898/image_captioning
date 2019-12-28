@@ -1,7 +1,7 @@
 import sys
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 
 from language_model.word_language_model.data_holder import Corpus

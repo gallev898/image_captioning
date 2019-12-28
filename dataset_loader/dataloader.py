@@ -2,7 +2,7 @@ import sys
 
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 import torchvision
 
@@ -111,7 +111,7 @@ def custom_loader(run_local, batch_size, num_workers):
     transform = transforms.Compose([
         transforms.Resize(256),
         transforms.ToTensor(),
-        data_normalization
+        # data_normalization #notice: normalize happenes inside Custom_Image_Dataset
         ])
 
     if run_local:

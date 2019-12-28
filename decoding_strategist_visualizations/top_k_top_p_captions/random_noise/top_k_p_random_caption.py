@@ -4,7 +4,7 @@ from decoding_strategist_visualizations.decoding_strategist_utils import *
 
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 from utils import *
 from dataset_loader.dataloader import load

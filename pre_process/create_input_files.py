@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 from standart_training.utils import create_input_files
 import os

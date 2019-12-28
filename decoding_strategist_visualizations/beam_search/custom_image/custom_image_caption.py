@@ -5,7 +5,7 @@ from language_model.word_language_model.data_holder import Corpus
 
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 from decoding_strategist_visualizations.decoding_strategist_utils import visualization
 from decoding_strategist_visualizations.beam_search.beam_search_pack_utils import *

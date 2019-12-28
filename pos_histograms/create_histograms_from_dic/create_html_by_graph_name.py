@@ -4,7 +4,7 @@ from dominate.tags import *
 import os
 
 
-model = 'run_7'
+model = 'run_8'
 
 custom_to_test = {}
 to_take_care_of = []

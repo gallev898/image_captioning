@@ -3,7 +3,7 @@ import sys
 
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-sys.path.append('/home/mlspeech/gshalev/gal/image_cap')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 # sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 
 
@@ -50,7 +50,7 @@ def get_model_path_and_save_path(args, save_dir_name):
 
 def get_models(model_path):
 
-    checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
+    checkpoint = torch.load(model_path, map_location=torch.device(device))
     decoder = checkpoint['decoder']
     decoder = decoder.to(device)
     decoder.eval()

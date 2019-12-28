@@ -2,11 +2,11 @@ import sys
 
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
+sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 from dataset_loader.dataloader import load
-from decoding_strategist.decoding_strategist_utils import visualization
-from decoding_strategist.beam_search.beam_search_pack_utils import *
+from decoding_strategist_visualizations.decoding_strategist_utils import visualization
+from decoding_strategist_visualizations.beam_search.beam_search_pack_utils import *
 
 import torch
 import en_core_web_sm
