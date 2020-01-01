@@ -13,9 +13,11 @@ args = parser.parse_args()
 
 if args.run_local:
     croped_images_folder = 'cropped_images'
-    origin_img_folder = 'images'
-    descriptions_file_name = 'data/class-descriptions-boxable.csv'
-    annotations_file_names = ['data/train/train-annotations-bbox.csv', 'data/test/test-annotations-bbox.csv']
+    origin_img_folder = '/home/gal/Desktop/Pycharm_projects/open_images_parser/images'
+    descriptions_file_name = '/home/gal/Desktop/Pycharm_projects/open_images_parser/data/class-descriptions-boxable.csv'
+    annotations_file_names = [
+        '/home/gal/Desktop/Pycharm_projects/open_images_parser/data/train/train-annotations-bbox.csv',
+        '/home/gal/Desktop/Pycharm_projects/open_images_parser/data/test/test-annotations-bbox.csv']
 
 else:
     croped_images_folder = '/yoav_stg/gshalev/semantic_labeling/cropped_open_images'
@@ -63,7 +65,6 @@ for file_name in annotations_file_names:
                 image_label = class_code_to_class_name[image_label_code]
 
                 if image_id in images_ids_to_label_name.keys() and image_label == images_ids_to_label_name[image_id]:
-
                     # section: Get image
                     img_name = image_id + '_' + images_ids_to_label_name[image_id] + '.jpg'
                     img = Image.open(os.path.join(origin_img_folder, img_name))
@@ -88,5 +89,4 @@ for file_name in annotations_file_names:
 
                     ex_count += 1
                 line_count += 1
-
 # run_crop_images.py

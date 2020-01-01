@@ -107,6 +107,25 @@ def sbu_loader(run_local, batch_size, num_workers, crop=False):
     return dataloader
 
 
+def cropped_images_loader(run_local, batch_size, num_workers):
+    transform = transforms.Compose([
+        transforms.Resize(256),
+        transforms.ToTensor(),
+        # data_normalization #notice: normalize happenes inside Custom_Image_Dataset
+        ])
+
+    if run_local:
+        path = '../../crop_images/cropped_images'
+        # path = os.path.join(path, 'custom_images')
+    else:
+        path = '/yoav_stg/gshalev/semantic_labeling/cropped_open_images'
+
+    data = Custom_Image_Dataset(path, transform, data_normalization)
+
+    dataloader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    return dataloader
+
 def custom_loader(run_local, batch_size, num_workers):
     transform = transforms.Compose([
         transforms.Resize(256),
@@ -120,6 +139,27 @@ def custom_loader(run_local, batch_size, num_workers):
         # path = os.path.join(path, 'custom_images')
     else:
         path = '/yoav_stg/gshalev/semantic_labeling/open_images'
+
+    data = Custom_Image_Dataset(path, transform, data_normalization)
+
+    dataloader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    return dataloader
+
+
+def cartoon_loader(run_local, batch_size, num_workers):
+    transform = transforms.Compose([
+        transforms.Resize(256),
+        transforms.ToTensor(),
+        # data_normalization #notice: normalize happenes inside Custom_Image_Dataset
+        ])
+
+    if run_local:
+        path = desktop_path
+        path = os.path.join(path, 'cartoons')
+        # path = os.path.join(path, 'custom_images')
+    else:
+        path = '/yoav_stg/gshalev/semantic_labeling/cartoon/cartoonset10k'
 
     data = Custom_Image_Dataset(path, transform, data_normalization)
 
@@ -169,6 +209,10 @@ def load(dataset, run_local, batch_size, num_workers):
         return sbu_loader(run_local, batch_size, num_workers)
     elif dataset == 'custom':
         return custom_loader(run_local, batch_size, num_workers)
+    elif dataset == 'cartoon':
+        return cartoon_loader(run_local, batch_size, num_workers)
+    elif dataset == 'cropped_images':
+        return cropped_images_loader(run_local, batch_size, num_workers)
     elif dataset == 'pre_custom':
         return pre_custom_loader(run_local, batch_size, num_workers)
     elif dataset == 'flicker':

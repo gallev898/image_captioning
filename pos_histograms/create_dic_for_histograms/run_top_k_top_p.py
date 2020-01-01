@@ -24,7 +24,6 @@ from dataset_loader.dataloader import load
 args = get_args()
 device = torch.device("cuda:{}".format(args.cuda) if torch.cuda.is_available() else "cpu")
 
-
 top_k = args.top_k  # NOTICE: int
 top_p = args.top_p  # NOTICE: double
 
@@ -103,6 +102,7 @@ def caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map):
 
 
 if __name__ == '__main__':
+
     print('Starting top K: {}'.format(args.top_k) if args.top_k > 0 else 'Starting top_p: {}'.format(
         args.top_p) if args.top_p > 0 else 'GOING TO BREAK')
     if args.top_p <= 0 and args.top_k <= 0:
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     print('create pos dic for {} data'.format(args.data))
 
     if args.data == 'test':
-        print('using cuda: {}',format(device))
+        print('using cuda: {}', format(device))
 
         print('args.data = {}'.format(args.data))
         p = '/yoav_stg/gshalev/image_captioning/output_folder'
@@ -133,28 +133,8 @@ if __name__ == '__main__':
             if not None == sen_likelihood:
                 sentences_likelihood.append(sen_likelihood)
 
-    if args.data == 'sbu':
-        dataloader = load('sbu', args.run_local, 1, 1)
-
-        for i, data in enumerate(dataloader):
-            print('index:{} data shape: {}'.format(i, data[0].shape))
-            _, _, _, sen_likelihood = caption_image_beam_search(encoder, decoder, data[0], word_map, rev_word_map)
-            sentences_likelihood.append(sen_likelihood)
-
-    # if args.data == 'svhn':
-    #     _, dataloader, _ = load('svhn', args.run_local, 1, 1)
-    #
-    #     for i, data in tqdm(enumerate(dataloader)):
-    #         _, _, _, sen_likelihood =   caption_image_beam_search(encoder, decoder, data[0], word_map, rev_word_map)
-    if args.data == 'flicker':
-        dataloader = load('flicker', args.run_local, 1, 1)
-
-        for i, data in enumerate(dataloader):
-            _, _, _, sen_likelihood = caption_image_beam_search(encoder, decoder, data[0], word_map, rev_word_map)
-            sentences_likelihood.append(sen_likelihood)
-
     if args.data == 'random':
-        print('using cuda: {}',format(device))
+        print('using cuda: {}', format(device))
 
         for i in tqdm(range(args.random_range)):
             img1 = np.random.uniform(low=0., high=255., size=(256, 256, 3))
@@ -175,11 +155,39 @@ if __name__ == '__main__':
             sentences_likelihood.append(sen_likelihood)
 
     if args.data == 'custom':
-        print('using cuda: {}',format(device))
+        print('using cuda: {}', format(device))
 
         dataloader = load('custom', args.run_local, 1, 1)
 
         for i, data in enumerate(dataloader):
+            image = data[0].to(device)
+            if image.shape[1] != 3:
+                continue
+            _, _, _, sen_likelihood = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map)
+            if not None == sen_likelihood:
+                sentences_likelihood.append(sen_likelihood)
+
+    if args.data == 'cartoon':
+        print('using cuda: {}', format(device))
+
+        dataloader = load('cartoon', args.run_local, 1, 1)
+
+        for i, data in enumerate(dataloader):
+            image = data[0].to(device)
+            if image.shape[1] != 3:
+                continue
+            _, _, _, sen_likelihood = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map)
+            if not None == sen_likelihood:
+                sentences_likelihood.append(sen_likelihood)
+
+    if args.data == 'cropped_images':
+
+        print('using cuda: {}', format(device))
+
+        dataloader = load('cropped_images', args.run_local, 1, 1)
+
+        for i, data in enumerate(dataloader):
+
             image = data[0].to(device)
             if image.shape[1] != 3:
                 continue

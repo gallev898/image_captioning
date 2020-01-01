@@ -101,6 +101,8 @@ def caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, b
 
 
 if __name__ == '__main__':
+
+
     print('Strating beam search : {}'.format(args.beam_size))
     model_path, save_dir = get_model_path_and_save_dir(args, 'pos_dic')
 
@@ -174,30 +176,44 @@ if __name__ == '__main__':
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
-    if args.data == 'sbu':
-        dataloader = load('sbu', args.run_local, 1, 1)
-
-        for i, data in tqdm(enumerate(dataloader)):
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, data[0], word_map, rev_word_map,
-                                                         args.beam_size)
-            if not None == seq_sum:
-                sentences_likelihood.append(seq_sum)
-
-    if args.data == 'flicker':
-        dataloader = load('flicker', args.run_local, 1, 1)
-
-        for i, data in tqdm(enumerate(dataloader)):
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, data[0], word_map, rev_word_map,
-                                                         args.beam_size)
-            if not None == seq_sum:
-                sentences_likelihood.append(seq_sum)
-
     if args.data == 'custom':
         print('using cuda: {}',format(device))
 
         dataloader = load('custom', args.run_local, 1, 1)
 
         for i, data in tqdm(enumerate(dataloader)):
+            image = data[0].to(device)
+            if image.shape[1] != 3:
+                continue
+            print('########## image shape:{}'.format(image.shape))
+            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+                                                         args.beam_size)
+            if not None == seq_sum:
+                sentences_likelihood.append(seq_sum)
+
+    if args.data == 'cartoon':
+        print('using cuda: {}',format(device))
+
+        dataloader = load('cartoon', args.run_local, 1, 1)
+
+        for i, data in tqdm(enumerate(dataloader)):
+            image = data[0].to(device)
+            if image.shape[1] != 3:
+                continue
+            print('########## image shape:{}'.format(image.shape))
+            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+                                                         args.beam_size)
+            if not None == seq_sum:
+                sentences_likelihood.append(seq_sum)
+
+    if args.data == 'cropped_images':
+
+        print('using cuda: {}', format(device))
+
+        dataloader = load('cropped_images', args.run_local, 1, 1)
+
+        for i, data in tqdm(enumerate(dataloader)):
+
             image = data[0].to(device)
             if image.shape[1] != 3:
                 continue
