@@ -39,7 +39,7 @@ def visualization(image, alphas, words, pos, top_seq_total_scors, top_seq_total_
         #                                                     # top_seq_total_scors_exp[t]),
         #          color='black', backgroundcolor='white',
         #          fontsize=10)
-        str_dis += '{} {} {}\n'.format(words[t], pos[t], top_seq_total_scors[t])
+        str_dis += '{} {} {}\n'.format(words[t], pos[t], top_seq_total_scors_exp[t])
         plt.imshow(image)
         current_alpha = alphas[t, :]
         if smooth:

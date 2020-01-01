@@ -116,7 +116,8 @@ def custom_loader(run_local, batch_size, num_workers):
 
     if run_local:
         path = desktop_path
-        path = os.path.join(path, 'custom_images')
+        path = os.path.join(path, 'cartoons')
+        # path = os.path.join(path, 'custom_images')
     else:
         path = '/yoav_stg/gshalev/semantic_labeling/open_images'
 
