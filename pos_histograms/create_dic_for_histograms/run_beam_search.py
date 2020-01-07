@@ -33,6 +33,9 @@ def caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, b
     seq, alphas, top_seq_total_scors, seq_sum, logits_list = beam_search_decode(encoder, image, beam_size, word_map,
                                                                                 decoder)
 
+    if seq == None:
+        return None, None, None, None
+
     words = [rev_word_map[ind] for ind in seq]
 
     words = words[1:-1]
@@ -102,7 +105,6 @@ def caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, b
 
 if __name__ == '__main__':
 
-
     print('Strating beam search : {}'.format(args.beam_size))
     model_path, save_dir = get_model_path_and_save_dir(args, 'pos_dic')
 
@@ -127,14 +129,16 @@ if __name__ == '__main__':
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
-    if args.data == 'perturbed_test_fog':
+    if args.data == 'perturbed_jpeg':
+
+        print('Create Dic for \'perturbed_jpeg\'')
         data_path = '/yoav_stg/gshalev/image_captioning/output_folder'
         coco_data = '../../output_folder' if args.run_local else data_path
 
         test_loader = torch.utils.data.DataLoader(
             CaptionDataset(coco_data, data_name, 'TEST', transform=transforms.Compose([
                 transforms.ToPILImage(),
-                ImgAugTransformFog(),
+                ImgAugTransformJpegCompression(),
                 lambda x: PIL.Image.fromarray(x),
                 transforms.ToTensor(),
                 data_normalization
@@ -142,6 +146,7 @@ if __name__ == '__main__':
             batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
 
         for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
+
             if i % 100 == 0:
                 print('process : {}/{}'.format(i, len(test_loader)))
             image = image.to(device)
@@ -150,14 +155,14 @@ if __name__ == '__main__':
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
-    if args.data == 'perturbed_test_snow':
+    if args.data == 'perturbed_salt':
+
         data_path = '/yoav_stg/gshalev/image_captioning/output_folder'
         coco_data = '../../output_folder' if args.run_local else data_path
 
         transform = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.Resize((336, 336)),
-            ImgAugTransformSnow(),
+            ImgAugTransformSaltAndPepper(),
             lambda x: PIL.Image.fromarray(x),
             transforms.ToTensor(),
             data_normalization

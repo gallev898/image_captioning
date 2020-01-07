@@ -50,7 +50,7 @@ def beam_search_decode(encoder, image, beam_size, word_map, decoder):
                                                                                                     beam_size,
                                                                                                     word_map)
 
-    global uncompleted_seq
+    uncompleted_seq = 0
 
     # Lists to store completed sequences, their alphas and scores
     complete_seqs = list()
@@ -145,7 +145,7 @@ def beam_search_decode(encoder, image, beam_size, word_map, decoder):
     if len(complete_seqs_scores) == 0:  # NOTICE
         print('complete_seqs_scores is empty')  # NOTICE
         uncompleted_seq += 1  # NOTICE
-        return  # NOTICE
+        return None, None, None, None, None
 
     i = complete_seqs_scores.index(max(complete_seqs_scores))
     seq_sum = round(max(complete_seqs_scores).item(), 4)

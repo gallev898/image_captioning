@@ -9,6 +9,8 @@ model = 'run_8'
 test_prefix = 'pos_dic_test_'
 custom_prefix = 'pos_dic_custom_'
 random_prefix = 'pos_dic_random_'
+cartoon_prefix = 'pos_dic_cartoon_'
+cropped_images_prefix = 'pos_dic_cropped_images_'
 
 decoding_strategies = ['beam_1', 'beam_5', 'beam_10', 'top_k_5', 'top_k_10', 'top_p_0.8', 'top_p_0.9']
 
@@ -17,15 +19,16 @@ for ds in decoding_strategies:
     custom_model_name = '{}{}'.format(custom_prefix, ds)
     test_model_name = '{}{}'.format(test_prefix, ds)
     random_model_name = '{}{}'.format(random_prefix, ds)
-
+    cartoon_model_name = '{}{}'.format(cartoon_prefix, ds)
+    cropped_images_name = '{}{}'.format(cropped_images_prefix, ds)
 
     dic_test_path = os.path.join(model, '{}'.format(test_model_name))
 
     pos_dic_test = glob.glob(os.path.join(model, '{}/*.png'.format(test_model_name)))
     pos_dic_custom = glob.glob(os.path.join(model, '{}/*.png'.format(custom_model_name)))
     pos_dic_random = glob.glob(os.path.join(model, '{}/*.png'.format(random_model_name)))
-
-
+    pos_dic_cartoon = glob.glob(os.path.join(model, '{}/*.png'.format(cartoon_model_name)))
+    pos_dic_cropped_images = glob.glob(os.path.join(model, '{}/*.png'.format(cropped_images_name)))
 
     with document(title='Photos') as doc:
         # h1('Photos')
@@ -33,26 +36,36 @@ for ds in decoding_strategies:
             l = tr()
             l += td(custom_model_name)
             l += td(random_model_name)
+            l += td(test_model_name)
+            l += td(cartoon_model_name)
             with l:
-                l.add(td(test_model_name))
+                l.add(td(cropped_images_name))
 
             dic = dict()
-            for path1 in pos_dic_custom:
-                png = path1[path1.rindex('/') + 1:]
-                x_ = [x for x in pos_dic_test if png in x]
-                x_2 = [x for x in pos_dic_random if png in x]
-                if len(x_) > 0 and len(x_2) >0:
-                    dic[path1] = (x_[0], x_2[0])
+            for custom in pos_dic_custom:
+                png = custom[custom.rindex('/') + 1:]
+                random = [x for x in pos_dic_random if png in x]
+                test = [x for x in pos_dic_test if png in x]
+                cartoon = [x for x in pos_dic_cartoon if png in x]
+                cropped_images = [x for x in pos_dic_cropped_images if png in x]
+                # if len(test) > 0 and len(random) >0:
+                dic[custom] = (random[0] if len(random) > 0 else None,
+                               test[0] if len(test)>0 else None,
+                               cartoon[0] if len(cartoon)>0 else None,
+                               cropped_images[0] if len(cropped_images)>0 else None)
+                    # dic[custom] = (random[0], test[0], cartoon[0], cropped_images[0])
 
-            for path1, path2 in dic.items():
+            for cus, others in dic.items():
                 l2 = tr()
-                l2 += td(img(src=path1), _class='photo')
-                l2 += td(img(src=path2[1]), _class='photo')
+                l2 += td(img(src=cus), _class='photo', label='custom')
+                l2 += td(img(src=others[0]), _class='photo', label='random') if others[0] != None else td()
+                l2 += td(img(src=others[1]), _class='photo', label='test') if others[1] != None else td()
+                l2 += td(img(src=others[2]), _class='photo', label='cartoon')if others[2] != None else td()
                 with l:
-                    l2.add(td(img(src=path2[0]), _class='photo'))
+                    l2.add(td(img(src=others[3]), _class='photo', label='cropped')) if others[0] != None else l2.add(td())
 
     # if not os.path.exists():
 
 
-    with open('gallery.html', 'w') as f:
+    with open('{}=gallery.html'.format(ds), 'w') as f:
         f.write(doc.render())

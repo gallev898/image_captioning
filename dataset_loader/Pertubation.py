@@ -91,14 +91,27 @@ class ImgAugTransformSaltAndPepper:
 
     def __init__(self):
         self.aug = iaa.Sequential([
-            #iaa.Resize(32),
-            iaa.SaltAndPepper(p=0.10)
+            iaa.SaltAndPepper(p=0.20)
             ])
 
 
     def __call__(self, img):
         img = np.array(img)
         return self.aug.augment_image(img)
+
+
+class ImgAugTransformJpegCompression:
+
+    def __init__(self):
+        self.aug = iaa.Sequential([
+            iaa.JpegCompression(100)
+            ])
+
+
+    def __call__(self, img):
+        img = np.array(img)
+        return self.aug.augment_image(img)
+
 
 
 # Pertubation.py
