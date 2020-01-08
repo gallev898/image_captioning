@@ -144,6 +144,7 @@ if __name__ == '__main__':
                 data_normalization
                 ])),
             batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
+        print('size of test_loader: {}'.format(len(test_loader)))
 
         for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
 

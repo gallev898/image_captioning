@@ -1,8 +1,11 @@
+import PIL
 import sys
+
 
 
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
+from dataset_loader.Pertubation import ImgAugTransformJpegCompression, ImgAugTransformSaltAndPepper
 
 from decoding_strategist_visualizations.top_k_top_p_captions.top_k_p_pack_utils import caption_image
 from utils import *
@@ -126,6 +129,58 @@ if __name__ == '__main__':
             batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
 
         print('lev test_loader: {}'.format(len(test_loader)))
+        for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
+            print(i)
+            image = image.to(device)
+            _, _, _, sen_likelihood = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map)
+            if not None == sen_likelihood:
+                sentences_likelihood.append(sen_likelihood)
+
+    if args.data == 'perturbed_jpeg':
+        print('using cuda: {}', format(device))
+
+        print('args.data = {}'.format(args.data))
+        p = '/yoav_stg/gshalev/image_captioning/output_folder'
+        coco_data = '../../output_folder' if args.run_local else p
+
+        transforms = transforms.Compose([
+            transforms.ToPILImage(),
+            ImgAugTransformJpegCompression(),
+            lambda x: PIL.Image.fromarray(x),
+            transforms.ToTensor(),
+            data_normalization
+            ])
+        test_loader = torch.utils.data.DataLoader(
+            CaptionDataset(coco_data, data_name, 'TEST', transform=transforms),
+            batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
+
+        print('len test_loader: {}'.format(len(test_loader)))
+        for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
+            print(i)
+            image = image.to(device)
+            _, _, _, sen_likelihood = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map)
+            if not None == sen_likelihood:
+                sentences_likelihood.append(sen_likelihood)
+
+    if args.data == 'perturbed_salt':
+        print('using cuda: {}', format(device))
+
+        print('args.data = {}'.format(args.data))
+        p = '/yoav_stg/gshalev/image_captioning/output_folder'
+        coco_data = '../../output_folder' if args.run_local else p
+
+        transforms = transforms.Compose([
+            transforms.ToPILImage(),
+            ImgAugTransformSaltAndPepper(),
+            lambda x: PIL.Image.fromarray(x),
+            transforms.ToTensor(),
+            data_normalization
+            ])
+        test_loader = torch.utils.data.DataLoader(
+            CaptionDataset(coco_data, data_name, 'TEST', transform=transforms),
+            batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
+
+        print('len test_loader: {}'.format(len(test_loader)))
         for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
             print(i)
             image = image.to(device)
