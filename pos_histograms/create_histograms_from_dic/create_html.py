@@ -11,6 +11,8 @@ custom_prefix = 'pos_dic_custom_'
 random_prefix = 'pos_dic_random_'
 cartoon_prefix = 'pos_dic_cartoon_'
 cropped_images_prefix = 'pos_dic_cropped_images_'
+jpeg_images_prefix = 'pos_dic_perturbed_jpeg_'
+salt_images_prefix = 'pos_dic_perturbed_salt_'
 
 decoding_strategies = ['beam_1', 'beam_5', 'beam_10', 'top_k_5', 'top_k_10', 'top_p_0.8', 'top_p_0.9']
 
@@ -21,6 +23,8 @@ for ds in decoding_strategies:
     random_model_name = '{}{}'.format(random_prefix, ds)
     cartoon_model_name = '{}{}'.format(cartoon_prefix, ds)
     cropped_images_name = '{}{}'.format(cropped_images_prefix, ds)
+    jpeg_images_name = '{}{}'.format(jpeg_images_prefix, ds)
+    salt_images_name = '{}{}'.format(salt_images_prefix, ds)
 
     dic_test_path = os.path.join(model, '{}'.format(test_model_name))
 
@@ -29,6 +33,8 @@ for ds in decoding_strategies:
     pos_dic_random = glob.glob(os.path.join(model, '{}/*.png'.format(random_model_name)))
     pos_dic_cartoon = glob.glob(os.path.join(model, '{}/*.png'.format(cartoon_model_name)))
     pos_dic_cropped_images = glob.glob(os.path.join(model, '{}/*.png'.format(cropped_images_name)))
+    pos_dic_jpeg_images = glob.glob(os.path.join(model, '{}/*.png'.format(jpeg_images_name)))
+    pos_dic_salt_images = glob.glob(os.path.join(model, '{}/*.png'.format(salt_images_name)))
 
     with document(title='Photos') as doc:
         # h1('Photos')
@@ -38,8 +44,10 @@ for ds in decoding_strategies:
             l += td(random_model_name)
             l += td(test_model_name)
             l += td(cartoon_model_name)
+            l += td(cropped_images_name)
+            l += td(jpeg_images_name)
             with l:
-                l.add(td(cropped_images_name))
+                l.add(td(salt_images_name))
 
             dic = dict()
             for custom in pos_dic_custom:
@@ -48,11 +56,15 @@ for ds in decoding_strategies:
                 test = [x for x in pos_dic_test if png in x]
                 cartoon = [x for x in pos_dic_cartoon if png in x]
                 cropped_images = [x for x in pos_dic_cropped_images if png in x]
+                jpeg_images = [x for x in pos_dic_jpeg_images if png in x]
+                salt_images = [x for x in pos_dic_salt_images if png in x]
                 # if len(test) > 0 and len(random) >0:
                 dic[custom] = (random[0] if len(random) > 0 else None,
                                test[0] if len(test)>0 else None,
                                cartoon[0] if len(cartoon)>0 else None,
-                               cropped_images[0] if len(cropped_images)>0 else None)
+                               cropped_images[0] if len(cropped_images)>0 else None,
+                               jpeg_images[0] if len(jpeg_images)>0 else None,
+                               salt_images[0] if len(salt_images)>0 else None)
                     # dic[custom] = (random[0], test[0], cartoon[0], cropped_images[0])
 
             for cus, others in dic.items():
@@ -61,11 +73,13 @@ for ds in decoding_strategies:
                 l2 += td(img(src=others[0]), _class='photo', label='random') if others[0] != None else td()
                 l2 += td(img(src=others[1]), _class='photo', label='test') if others[1] != None else td()
                 l2 += td(img(src=others[2]), _class='photo', label='cartoon')if others[2] != None else td()
+                l2 += td(img(src=others[3]), _class='photo', label='crppped')if others[3] != None else td()
+                l2 += td(img(src=others[4]), _class='photo', label='jpeg')if others[4] != None else td()
                 with l:
-                    l2.add(td(img(src=others[3]), _class='photo', label='cropped')) if others[0] != None else l2.add(td())
+                    l2.add(td(img(src=others[5]), _class='photo', label='salt')) if others[5] != None else l2.add(td())
 
     # if not os.path.exists():
 
 
-    with open('{}=gallery.html'.format(ds), 'w') as f:
+    with open('{}-gallery.html'.format(ds), 'w') as f:
         f.write(doc.render())

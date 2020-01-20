@@ -32,7 +32,7 @@ top_p = args.top_p  # NOTICE: double
 
 
 def caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map):
-    seq, seqs_alpha, seqs_prop, seqs_logits = caption_image(encoder, decoder, image, word_map, top_k, top_p)
+    seq, seqs_alpha, seqs_prop, seqs_logits = caption_image(encoder, decoder, image, word_map, top_k, top_p, device)
 
     words = [rev_word_map[ind] for ind in seq]
 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
         exit(" top_k or top _p must have a value")
 
     model_path, save_dir = get_model_path_and_save_dir(args, 'pos_dic')
-    encoder, decoder = get_models(model_path)
+    encoder, decoder = get_models(model_path, device)
     word_map, rev_word_map = get_word_map(args.run_local, '../../output_folder/WORDMAP_' + data_name + '.json')
 
     print('create pos dic for {} data'.format(args.data))

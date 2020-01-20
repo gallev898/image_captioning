@@ -48,7 +48,7 @@ def get_model_path_and_save_path(args, save_dir_name):
     return model_path, save_dir
 
 
-def get_models(model_path):
+def get_models(model_path, device):
 
     checkpoint = torch.load(model_path, map_location=torch.device(device))
     decoder = checkpoint['decoder']

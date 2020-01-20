@@ -47,7 +47,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     return logits
 
 
-def caption_image(encoder, decoder, image, word_map, top_k, top_p):
+def caption_image(encoder, decoder, image, word_map, top_k, top_p, device):
     # Here is how to use this function for top-p sampling
     temperature = 1.0
 
