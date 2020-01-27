@@ -328,9 +328,10 @@ def get_args():
     parser.add_argument('--fine_tune_encoder', default=False, action='store_true')
     parser.add_argument('--debug', default=False, action='store_true')
     parser.add_argument('--fine_tune_epochs', default=-1, type=int)
+    parser.add_argument('--learning_rate', default=-1, type=float)
 
     parser.add_argument('--run_local', default=False, action='store_true')
     parser.add_argument('--batch_size', default=32, type=int)
     args = parser.parse_args()
     return args
-# utils.py
+# pack_utils.py
