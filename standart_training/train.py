@@ -19,7 +19,7 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 
 from torch import nn
-from standart_training.utils import *
+from standart_training.pack_utils import *
 from standart_training.models import Encoder, DecoderWithAttention
 from dataset_loader.datasets import *
 from torch.nn.utils.rnn import pack_padded_sequence

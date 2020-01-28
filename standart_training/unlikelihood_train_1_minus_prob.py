@@ -233,10 +233,11 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         fake_caps_and_lens_lst = random.sample(list(train_caps_lst), num_of_fake)
         fake_caps_lst = [x[0][0] for x in fake_caps_and_lens_lst]
         fake_caps_lens_lst = [x[1][0] for x in fake_caps_and_lens_lst]
+
         all_caps = torch.cat((caps, torch.stack(fake_caps_lst)))
         all_caps_lens = torch.cat((caplens, torch.stack(fake_caps_lens_lst)))
         double_imgs = torch.cat((imgs, imgs))
-        origin_caplens = caplens
+
         imgs, caps, caplens = double_imgs.to(device), all_caps.to(device), all_caps_lens.to(device)
 
         # section: encode
@@ -250,6 +251,13 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
         #notice: because was sorted in decoder
         scores = scores[sort_ind]
+
+        #notice - 1 - prob
+        fake_prob = scores[2:].to(device)
+        ones = torch.ones([fake_prob.shape[0], fake_prob.shape[1], fake_prob.shape[2]]).to(device)
+        one_munus_fake_prob = (ones - fake_prob).to(device)
+        scores = torch.cat((scores[:2], one_munus_fake_prob)).to(device)
+
         # Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
         targets = caps[:, 1:]
         decode_lengths = (caplens - 1).squeeze(1).tolist()
@@ -260,12 +268,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         targets = pack_padded_sequence(targets, decode_lengths, batch_first=True, enforce_sorted=False).data
 
         # section Calculate loss
-        loss = criterion(scores, targets)
-
-        ones = torch.ones(sum(origin_caplens - 1).item())
-        minus = torch.ones(sum(torch.stack(fake_caps_lens_lst) - 1)).fill_(args.alpha)
-        unlikelihood = torch.cat((ones, minus)).to(device)
-        loss = torch.mean(torch.mul(loss, unlikelihood)).to(device)
+        loss = criterion(scores, targets).mean()
 
         # Add doubly stochastic attention regularization
         loss += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
@@ -587,4 +590,4 @@ if __name__ == '__main__':
     print('args.alpha : {}'.format(args.alpha))
     main()
 
-# unlikelihood_train.py
+# unlikelihood_train_1_minus_prob.py
