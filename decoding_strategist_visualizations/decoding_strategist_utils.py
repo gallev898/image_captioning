@@ -33,6 +33,7 @@ def visualization(image, alphas, words, pos, top_seq_total_scors, top_seq_total_
             break
         plt.subplot(np.ceil(len(words) / 5.), 5, t + 1)
 
+        plt.text(0, 1, '{}'.format(words[t]))
         str_dis += '{} {} {}\n'.format(words[t], pos[t], top_seq_total_scors_exp[t])
         plt.imshow(image)
         current_alpha = alphas[t, :]

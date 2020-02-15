@@ -1,4 +1,3 @@
-
 import sys
 
 
@@ -19,16 +18,20 @@ from torch import nn
 from utils import get_word_map, data_normalization
 from torch.nn.utils.rnn import pack_padded_sequence
 from standart_training.pack_utils import *
-from dataset_loader.datasets import *
+from dataset_loader.datasets2 import *
 from standart_training.models import Encoder, DecoderWithAttention
 from nltk.translate.bleu_score import corpus_bleu
+
 
 # section: args & wndb
 args = get_args()
 
 # wandb login a8c4526db3e8aa11d7b2674d7c257c58313b45ca
+
 if not args.run_local:
     import wandb
+
+
     wandb.init(project="image_captioning", name=args.runname)
 
 # section: Model parameters
@@ -41,7 +44,6 @@ cudnn.benchmark = True  # set to true only if inputs to model are fixed size; ot
 
 # section: Training parameters
 batch_size = args.batch_size
-# batch_size = 1 if args.run_local else args.batch_size
 workers = 1  # for data-loading; right now, only 1 works with h5py
 start_epoch = 0
 epochs = 120  # number of epochs to train for (if early stopping is not triggered)
@@ -54,8 +56,8 @@ alpha_c = 1.  # regularization parameter for 'doubly stochastic attention', as i
 best_bleu4 = 0.  # BLEU-4 score right now
 print_freq = 100  # print training/validation stats every __ batches
 
-
 # section: get all train caps
+#todo: debug
 train_caps_lst = torch.load(
     '/yoav_stg/gshalev/image_captioning/output_folder/train_caps_lst' if not args.run_local else '../output_folder/train_caps_lst')
 
@@ -117,10 +119,8 @@ def main():
         wandb.watch(decoder)
 
     # section: loss func
+    # todo: debug
     criterion = nn.NLLLoss(reduction='none')
-    # reduce=False, size_average=False).to(device)
-    # criterion = nn.CrossEntropyLoss().to(device)
-
     # section: data loader
     if not args.run_local:
         data_f = '/yoav_stg/gshalev/image_captioning/output_folder'
@@ -211,7 +211,6 @@ def main():
 
 
 def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch):
-
     # section: train mode
     decoder.train()  # train mode (dropout and batchnorm is used)
     encoder.train()
@@ -226,17 +225,22 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
     # section: start batches
     for i, (imgs, caps, caplens) in enumerate(train_loader):
 
-        data_time.update(time.time() - start)
+        if len(caps) != args.batch_size:
+            continue
 
-        # notice: cat the images and caps
+        data_time.update(time.time() - start)
+        origin_caps = caps
+        origin_caps_len = sum((caplens-1).squeeze(1)).item()
+        # section: cat the images and caps
         num_of_fake = args.num_of_fake
         fake_caps_and_lens_lst = random.sample(list(train_caps_lst), num_of_fake)
         fake_caps_lst = [x[0][0] for x in fake_caps_and_lens_lst]
         fake_caps_lens_lst = [x[1][0] for x in fake_caps_and_lens_lst]
+        fake_caps_lens = sum((torch.stack(fake_caps_lens_lst) - 1).squeeze(1)).item()
 
         all_caps = torch.cat((caps, torch.stack(fake_caps_lst)))
         all_caps_lens = torch.cat((caplens, torch.stack(fake_caps_lens_lst)))
-        double_imgs = torch.cat((imgs, imgs))
+        double_imgs = torch.cat((imgs, imgs.repeat(2, 1, 1, 1)[:num_of_fake, :, :, :]))
 
         imgs, caps, caplens = double_imgs.to(device), all_caps.to(device), all_caps_lens.to(device)
 
@@ -246,17 +250,23 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         # section: decoding wright captions
         scores, caps_sorted, decode_lengths, alphas, sort_ind = decoder(imgs, caps, caplens)
 
-        #notice: lof softmax because of NLLoss
-        scores = F.log_softmax(scores)
+        # notice: do softmax
+        scores = F.softmax(scores, dim=2)
 
-        #notice: because was sorted in decoder
-        scores = scores[sort_ind]
+        # notice: unsort because was sorted in decoder
+        temp = torch.empty_like(scores)
+        temp[sort_ind] = scores
+        scores = temp
 
-        #notice - 1 - prob
-        fake_prob = scores[2:].to(device)
+        # notice : 1 - prob
+        # zeros_and_ones = torch.cat((torch.zeros(len(origin_caps)), torch.ones(num_of_fake)))
+        # one_minus_a = zeros_and_ones - scores
+        # minus_ones_and_ones = torch.cat((torch.mul(-1, torch.ones(len(origin_caps))), torch.ones(num_of_fake)))
+        # scores = torch.mul(minus_ones_and_ones, one_minus_a)
+        fake_prob = scores[len(origin_caps):].to(device)
         ones = torch.ones([fake_prob.shape[0], fake_prob.shape[1], fake_prob.shape[2]]).to(device)
-        one_munus_fake_prob = (ones - fake_prob).to(device)
-        scores = torch.cat((scores[:2], one_munus_fake_prob)).to(device)
+        one_minus_fake_prob = (ones - fake_prob).to(device)
+        scores = torch.cat((scores[:len(origin_caps)], one_minus_fake_prob)).to(device)
 
         # Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
         targets = caps[:, 1:]
@@ -267,10 +277,23 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         scores = pack_padded_sequence(scores, decode_lengths, batch_first=True, enforce_sorted=False).data
         targets = pack_padded_sequence(targets, decode_lengths, batch_first=True, enforce_sorted=False).data
 
-        # section Calculate loss
-        loss = criterion(scores, targets).mean()
+        # notice: do log
+        # if epoch == 5:
+        #     print('scores shape: {}'.format(scores.shape))
+        #     print('min score: {}'.format(min(scores)))
+        #     print('max score: {}'.format(max(scores)))
+        scores = torch.log(scores+1e-4)
 
-        # Add doubly stochastic attention regularization
+        # section Calculate loss
+        if args.alpha > 0:
+            loss = criterion(scores, targets)
+            assert loss.shape[0] == origin_caps_len + fake_caps_lens
+            mul_tensor = torch.cat((torch.ones(origin_caps_len), torch.ones(fake_caps_lens).fill_(args.alpha))).to(device)
+            loss = torch.mul(loss, mul_tensor).mean().to(device)
+        else:
+            loss = criterion(scores, targets).mean()
+
+            # Add doubly stochastic attention regularization
         loss += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
         # Back prop.
@@ -502,8 +525,9 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map):
             scores = pack_padded_sequence(scores, decode_lengths, batch_first=True).data
             targets = pack_padded_sequence(targets, decode_lengths, batch_first=True).data
 
+            scores = F.log_softmax(scores)
             # Calculate loss
-            loss = criterion(scores, targets)
+            loss = criterion(scores, targets).mean()
 
             # Add doubly stochastic attention regularization
             # We know the weights sum to 1 at a given timestep. But we also encourage
@@ -585,9 +609,10 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map):
 if __name__ == '__main__':
     print('batch_size : {}'.format(args.batch_size))
     print('learning_rate : {}'.format(args.learning_rate))
+    print('decoder_lr : {}'.format(decoder_lr))
+    print('encoder_lr : {}'.format(encoder_lr))
     print('num_of_fake : {}'.format(args.num_of_fake))
     print('runname : {}'.format(args.runname))
     print('args.alpha : {}'.format(args.alpha))
     main()
-
 # unlikelihood_train_1_minus_prob.py

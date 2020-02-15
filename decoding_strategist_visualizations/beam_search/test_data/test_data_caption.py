@@ -17,6 +17,7 @@ import torchvision.transforms as transforms
 
 
 args = get_args()
+device = torch.device("cuda:{}".format(args.cuda) if torch.cuda.is_available() else "cpu")
 
 
 def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_name, smooth=True):
@@ -61,10 +62,6 @@ def run(encoder, decoder, word_map, rev_word_map, save_dir, image_path, image_na
 
 if __name__ == '__main__':
     save_dir_name = '{}_{}'.format(args.beam_size, args.save_dir_name)
-    model_path, save_dir = get_model_path_and_save_path(args, save_dir_name)
-
-    # Load model
-    encoder, decoder = get_models(model_path)
 
     # Create rev word map
     word_map, rev_word_map = get_word_map()
@@ -73,10 +70,34 @@ if __name__ == '__main__':
         CaptionDataset('../../../output_folder', data_name, 'TEST', transform=transforms.Compose([data_normalization])),
         batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
 
-    for i, (image, caps, caplens, allcaps) in enumerate(test_loader):
-        if i > 20:
-            break
-        caps_ = [rev_word_map[x.item()] for x in caps[0]]
-        ind = caps_.index('<end>')
-        name = ' '.join(caps_[1:ind])
-        run(encoder, decoder, word_map, rev_word_map, save_dir, image, name)
+    if args.multiple_models:
+        model_paths, save_dirs = get_multiple_models_path_and_save_path(args, save_dir_name)
+
+        for i, (image, caps, caplens, allcaps) in enumerate(test_loader):
+            if i > 5:
+                break
+
+            for model_path, save_dir in zip(model_paths, save_dirs):
+
+                # Load model
+                encoder, decoder = get_models(model_path, device)
+
+                caps_ = [rev_word_map[x.item()] for x in caps[0]]
+                ind = caps_.index('<end>')
+                name = '{}_{}'.format(i, ' '.join(caps_[1:ind]))
+                run(encoder, decoder, word_map, rev_word_map, save_dir, image, name)
+
+    else:
+        model_path, save_dir = get_model_path_and_save_path(args, save_dir_name)
+
+        # Load model
+        encoder, decoder = get_models(model_path, device)
+
+        for i, (image, caps, caplens, allcaps) in enumerate(test_loader):
+            if i > 0:
+                break
+            caps_ = [rev_word_map[x.item()] for x in caps[0]]
+            ind = caps_.index('<end>')
+            name = ' '.join(caps_[1:ind])
+            run(encoder, decoder, word_map, rev_word_map, save_dir, image, name)
+

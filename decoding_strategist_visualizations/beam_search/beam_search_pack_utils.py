@@ -169,6 +169,10 @@ def get_args():
     parser = argparse.ArgumentParser(description='Show, Attend, and Tell - Tutorial - Generate Caption')
 
     parser.add_argument('--model', type=str)
+    parser.add_argument('--model1', type=str)
+    parser.add_argument('--model2', type=str)
+    parser.add_argument('--model3', type=str)
+    parser.add_argument('--multiple_models', default=False, action='store_true')
     parser.add_argument('--save_dir_name', type=str, default='beam_size')
     parser.add_argument('--run_local', default=False, action='store_true')
     parser.add_argument('--limit_ex', type=int, default=10)

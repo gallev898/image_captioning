@@ -5,7 +5,7 @@ import os
 
 
 if __name__ == '__main__':
-    model_name = 'run_8'
+    model_name = 'unlikelihood_1_minus_prob_16_16'
     dics_path = '../create_dic_for_histograms/pos_dic/{}/pos_dic'.format(model_name)
 
     for dic_name in os.listdir(dics_path):

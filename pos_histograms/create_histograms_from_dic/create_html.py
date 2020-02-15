@@ -4,7 +4,7 @@ from dominate.tags import *
 import os
 
 
-model = 'run_8'
+model = 'unlikelihood_1_minus_prob_16_16'
 
 test_prefix = 'pos_dic_test_'
 custom_prefix = 'pos_dic_custom_'

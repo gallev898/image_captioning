@@ -6,7 +6,7 @@ from metrics.calc_metric import bhatta_dist, auroc, auprIn, auprOut
 
 
 if __name__ == '__main__':
-    model_name = 'run_8'
+    model_name = 'unlikelihood_1_minus_prob_16_16'
     dics_path = '../pos_histograms/create_dic_for_histograms/pos_dic/{}/pos_dic'.format(model_name)
 
     custom_dics = set()

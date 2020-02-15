@@ -21,7 +21,8 @@ import torchvision.transforms as transforms
 from torch import nn
 from standart_training.pack_utils import *
 from standart_training.models import Encoder, DecoderWithAttention
-from dataset_loader.datasets import *
+from dataset_loader.datasets2 import *
+# from dataset_loader.datasets import *
 from torch.nn.utils.rnn import pack_padded_sequence
 from nltk.translate.bleu_score import corpus_bleu
 
@@ -258,6 +259,9 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
     # Batches
     for i, (imgs, caps, caplens) in enumerate(train_loader):
+        # print(i)
+        # if i < 35100:
+        #     continue
         if (args.run_local or args.debug) and i > 2:
             break
 

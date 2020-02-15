@@ -106,7 +106,7 @@ if __name__ == '__main__':
     print('Strating beam search : {}'.format(args.beam_size))
     model_path, save_dir = get_model_path_and_save_dir(args, 'pos_dic')
 
-    encoder, decoder = get_models(model_path)
+    encoder, decoder = get_models(model_path, device)
     word_map, rev_word_map = get_word_map(args.run_local, '../../output_folder/WORDMAP_' + data_name + '.json')
 
     print('create pos dic for {} data'.format(args.data))
@@ -251,7 +251,7 @@ if __name__ == '__main__':
             if image.shape[1] != 3:
                 continue
             print('########## image shape:{}'.format(image.shape))
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+            _, _, _, seq_sum, words = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
                                                          args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
@@ -296,7 +296,7 @@ if __name__ == '__main__':
         os.mkdir(metrics_save_dir)
         print('created dir: {}'.format(metrics_save_dir))
 
-    metrics_result_file_name = 'metrics_results_{}_{}'.format(args.data, args.beam_size)
+    metrics_result_file_name = 'metrics_results_{}_beam_{}'.format(args.data, args.beam_size)
     torch.save({'gt':gt_metric_dic, 'hyp':hp_metric_dic}, os.path.join(metrics_save_dir, metrics_result_file_name))
     print('Saved metrics results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
 # run_beam_search.py
