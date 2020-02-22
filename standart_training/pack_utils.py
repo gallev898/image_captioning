@@ -322,6 +322,7 @@ def accuracy(scores, targets, k):
 
 def get_args():
     parser = argparse.ArgumentParser(description='train')
+    parser.add_argument('--replace_type', type=str)
     parser.add_argument('--runname', type=str)
     parser.add_argument('--cuda', type=int, default=0)
     parser.add_argument('--checkpoint', default=None, type=str)

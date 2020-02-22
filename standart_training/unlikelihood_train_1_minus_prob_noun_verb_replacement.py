@@ -57,9 +57,18 @@ best_bleu4 = 0.  # BLEU-4 score right now
 print_freq = 100  # print training/validation stats every __ batches
 
 # section: get all train caps
-#todo: debug
-train_caps_lst = torch.load(
-    '/yoav_stg/gshalev/image_captioning/output_folder/train_caps_lst' if not args.run_local else '../output_folder/train_caps_lst')
+# todo: debug
+if args.replace_type not in ['noun', 'verb', 'full']:
+    raise Exception('replace_type must be in [noun, verb, full]')
+
+if args.num_of_fake > args.batch_size:
+    raise Exception('num of fake examples should be lower or equal then batch_size')
+
+replace_dic_load_path = '/yoav_stg/gshalev/image_captioning/output_folder/{}_masking_train_caps'.format(
+    args.replace_type) if not args.run_local else '{}_masking_train_caps'.format(args.replace_type)
+replace_dic = torch.load(replace_dic_load_path)
+noun_idx_set = torch.load('noun_idx_set' if args.run_local else '/yoav_stg/gshalev/image_captioning/output_folder/noun_idx_set')
+verb_idx_set = torch.load('verb_idx_set' if args.run_local else '/yoav_stg/gshalev/image_captioning/output_folder/verb_idx_set')
 
 
 def main():
@@ -71,6 +80,13 @@ def main():
 
     # section: get word map
     word_map, rev_word_map = get_word_map(args.run_local, '../output_folder/WORDMAP_' + data_name + '.json')
+
+    # notice: add the verb and noun to dic
+    rev_word_map[9491] = 'NOUN'
+    rev_word_map[9492] = 'VERB'
+
+    word_map['NOUN'] = 9491
+    word_map['VERB'] = 9492
 
     # section: Initialization
     if args.checkpoint is None:
@@ -129,7 +145,7 @@ def main():
 
     train_loader = torch.utils.data.DataLoader(
         CaptionDataset(data_f, data_name, 'TRAIN', transform=transforms.Compose([data_normalization])),
-        batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
+        batch_size=batch_size, shuffle=True if not args.run_local else False, num_workers=workers, pin_memory=True)
 
     val_loader = torch.utils.data.DataLoader(
         CaptionDataset(data_f, data_name, 'VAL', transform=transforms.Compose([data_normalization])),
@@ -211,7 +227,6 @@ def main():
 
 
 def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch):
-
     # section: train mode
     decoder.train()  # train mode (dropout and batchnorm is used)
     encoder.train()
@@ -224,27 +239,55 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
     start = time.time()
 
     # section: start batches
-    for i, (imgs, caps, caplens, l) in enumerate(train_loader):
-        print('index: {}    lens: {}'.format(l, caplens))
-
+    for i, (imgs, caps, caplens) in enumerate(train_loader):
         if len(caps) != args.batch_size:
             continue
 
         data_time.update(time.time() - start)
         origin_caps = caps
-        origin_caps_len = sum((caplens-1).squeeze(1)).item()
+        origin_caps_len = sum((caplens - 1).squeeze(1)).item()
 
         # section: cat the images and caps
         num_of_fake = args.num_of_fake
-        #TODO
-        #
-        fake_caps_and_lens_lst = random.sample(list(train_caps_lst), num_of_fake)#todo
-        fake_caps_lst = [x[0][0] for x in fake_caps_and_lens_lst]#todo
-        fake_caps_lens_lst = [x[1][0] for x in fake_caps_and_lens_lst]#todo
+        fake_caps_lst = []
+        fake_caps_lens_lst = []
+        fake_zero_vectors = []
+        pos_indexes = []
+
+        caps_key = [str(c).replace('\n', '') for c in caps]
+
+        for k in caps_key:
+            fake_caps_lst.append(replace_dic[k][0].squeeze(0))
+            fake_caps_lens_lst.append(replace_dic[k][1].squeeze(0))
+            fake_zero_vectors.append(replace_dic[k][2])
+            pos_indexes.append(replace_dic[k][3])
+
+        fake_caps_lst = fake_caps_lst[:num_of_fake]
+        fake_caps_lens_lst = fake_caps_lens_lst[:num_of_fake]
+        fake_zero_vectors = fake_zero_vectors[:num_of_fake]
+        pos_indexes = pos_indexes[:num_of_fake]
+
         fake_caps_lens = sum((torch.stack(fake_caps_lens_lst) - 1).squeeze(1)).item()
 
-        all_caps = torch.cat((caps, torch.stack(fake_caps_lst)))
-        all_caps_lens = torch.cat((caplens, torch.stack(fake_caps_lens_lst)))
+        #notice: replace nouns/verbs
+        if args.replace_type in ['noun', 'verb']:
+            for fake, pos_idx in zip(fake_caps_lst, pos_indexes):
+                random_samples = random.sample(list(noun_idx_set if args.replace_type == 'noun' else verb_idx_set), len(pos_idx))
+                for i, pi in enumerate(pos_idx):
+                    fake[pi] = random_samples[i]
+        else: # == full
+            for fake, pos_idx in zip(fake_caps_lst, pos_indexes):
+                noun_idx = pos_idx[0]
+                verb_idx = pos_idx[1]
+                random_noun_samples = random.sample(list(noun_idx_set), len(noun_idx))
+                random_verb_samples = random.sample(list(verb_idx_set), len(verb_idx))
+                for i, ni in enumerate(noun_idx):
+                    fake[ni] = random_noun_samples[i]
+                for i, vi in enumerate(verb_idx):
+                    fake[vi] = random_verb_samples[i]
+
+        all_caps = torch.cat((caps, torch.stack(fake_caps_lst)))[:args.batch_size + num_of_fake, :]
+        all_caps_lens = torch.cat((caplens, torch.stack(fake_caps_lens_lst)))[:args.batch_size + num_of_fake, :]
         double_imgs = torch.cat((imgs, imgs.repeat(2, 1, 1, 1)[:num_of_fake, :, :, :]))
 
         imgs, caps, caplens = double_imgs.to(device), all_caps.to(device), all_caps_lens.to(device)
@@ -264,15 +307,22 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         scores = temp
 
         # notice : 1 - prob
-        # zeros_and_ones = torch.cat((torch.zeros(len(origin_caps)), torch.ones(num_of_fake)))
-        # one_minus_a = zeros_and_ones - scores
-        # minus_ones_and_ones = torch.cat((torch.mul(-1, torch.ones(len(origin_caps))), torch.ones(num_of_fake)))
-        # scores = torch.mul(minus_ones_and_ones, one_minus_a)
-        fake_prob = scores[len(origin_caps):].to(device)
-        ones = torch.ones([fake_prob.shape[0], fake_prob.shape[1], fake_prob.shape[2]]).to(device)
-        one_minus_fake_prob = (ones - fake_prob).to(device)
-        scores = torch.cat((scores[:len(origin_caps)], one_minus_fake_prob)).to(device)
+        ones_for_fake_part = torch.ones(num_of_fake, scores.shape[1], scores.shape[2])
+        zeros_for_real_part = torch.zeros(len(origin_caps), scores.shape[1], scores.shape[2])
+        minus_ones_for_real_part = torch.mul(-1, torch.ones(len(origin_caps), scores.shape[1], scores.shape[2]))
 
+        zeros_and_ones = torch.cat((zeros_for_real_part, ones_for_fake_part))
+        minus_ones_and_ones = torch.cat((minus_ones_for_real_part, ones_for_fake_part))
+
+        zeros_and_ones_minus_scors = zeros_and_ones - scores
+        scores = torch.mul(minus_ones_and_ones, zeros_and_ones_minus_scors)
+
+        ####
+        # fake_prob = scores[len(origin_caps):].to(device)
+        # ones = torch.ones([fake_prob.shape[0], fake_prob.shape[1], fake_prob.shape[2]]).to(device)
+        # one_minus_fake_prob = (ones - fake_prob).to(device)
+        # scores = torch.cat((scores[:len(origin_caps)], one_minus_fake_prob)).to(device)
+        ####
         # Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
         targets = caps[:, 1:]
         decode_lengths = (caplens - 1).squeeze(1).tolist()
@@ -283,22 +333,16 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         targets = pack_padded_sequence(targets, decode_lengths, batch_first=True, enforce_sorted=False).data
 
         # notice: do log
-        # if epoch == 5:
-        #     print('scores shape: {}'.format(scores.shape))
-        #     print('min score: {}'.format(min(scores)))
-        #     print('max score: {}'.format(max(scores)))
-        scores = torch.log(scores+1e-4)
+        scores = torch.log(scores + 1e-4)
 
         # section Calculate loss
-        if args.alpha > 0:
-            loss = criterion(scores, targets)
-            assert loss.shape[0] == origin_caps_len + fake_caps_lens
-            mul_tensor = torch.cat((torch.ones(origin_caps_len), torch.ones(fake_caps_lens).fill_(args.alpha))).to(device)
-            loss = torch.mul(loss, mul_tensor).mean().to(device)
-        else:
-            loss = criterion(scores, targets).mean()
+        # notice: mul by zero vectors
+        loss = criterion(scores, targets)
+        assert loss.shape[0] == origin_caps_len + fake_caps_lens
+        mul_tensor = torch.cat((torch.ones(origin_caps_len), torch.cat(fake_zero_vectors))).to(device)
+        loss = torch.mul(loss, mul_tensor).mean().to(device)
 
-            # Add doubly stochastic attention regularization
+        # Add doubly stochastic attention regularization
         loss += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
         # Back prop.

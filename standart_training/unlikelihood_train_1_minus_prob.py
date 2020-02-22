@@ -18,7 +18,7 @@ from torch import nn
 from utils import get_word_map, data_normalization
 from torch.nn.utils.rnn import pack_padded_sequence
 from standart_training.pack_utils import *
-from dataset_loader.datasets2 import *
+from dataset_loader.datasets import *
 from standart_training.models import Encoder, DecoderWithAttention
 from nltk.translate.bleu_score import corpus_bleu
 
@@ -259,14 +259,18 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         scores = temp
 
         # notice : 1 - prob
-        # zeros_and_ones = torch.cat((torch.zeros(len(origin_caps)), torch.ones(num_of_fake)))
-        # one_minus_a = zeros_and_ones - scores
-        # minus_ones_and_ones = torch.cat((torch.mul(-1, torch.ones(len(origin_caps))), torch.ones(num_of_fake)))
-        # scores = torch.mul(minus_ones_and_ones, one_minus_a)
-        fake_prob = scores[len(origin_caps):].to(device)
-        ones = torch.ones([fake_prob.shape[0], fake_prob.shape[1], fake_prob.shape[2]]).to(device)
-        one_minus_fake_prob = (ones - fake_prob).to(device)
-        scores = torch.cat((scores[:len(origin_caps)], one_minus_fake_prob)).to(device)
+        zeros_and_ones = torch.cat((torch.zeros(len(origin_caps), scores.shape[1], scores.shape[2]),
+                                    torch.ones(num_of_fake, scores.shape[1], scores.shape[2])))
+        one_minus_a = zeros_and_ones - scores
+        minus_ones_and_ones = torch.cat((torch.mul(-1, torch.ones(len(origin_caps), scores.shape[1], scores.shape[2])),
+                                         torch.ones(num_of_fake, scores.shape[1], scores.shape[2])))
+        scores = torch.mul(minus_ones_and_ones, one_minus_a)
+        ####
+        # fake_prob = scores[len(origin_caps):].to(device)
+        # ones = torch.ones([fake_prob.shape[0], fake_prob.shape[1], fake_prob.shape[2]]).to(device)
+        # one_minus_fake_prob = (ones - fake_prob).to(device)
+        # scores = torch.cat((scores[:len(origin_caps)], one_minus_fake_prob)).to(device)
+        ####
 
         # Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
         targets = caps[:, 1:]
@@ -462,13 +466,14 @@ def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_m
                 break
             step += 1
 
-        i = complete_seqs_scores.index(max(complete_seqs_scores))
+        if len(complete_seqs_scores) > 0:
+            i = complete_seqs_scores.index(max(complete_seqs_scores))
 
-        seq = complete_seqs[i]
+            seq = complete_seqs[i]
 
-        words = [rev_word_map[ind] for ind in seq]
+            words = [rev_word_map[ind] for ind in seq]
 
-        print('5    ' + ' '.join(words))
+            print('5    ' + ' '.join(words))
 
 
 def validate(val_loader, encoder, decoder, criterion, rev_word_map):

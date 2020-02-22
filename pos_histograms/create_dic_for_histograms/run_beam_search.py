@@ -110,7 +110,9 @@ if __name__ == '__main__':
     word_map, rev_word_map = get_word_map(args.run_local, '../../output_folder/WORDMAP_' + data_name + '.json')
 
     print('create pos dic for {} data'.format(args.data))
+    metrics_data_type_to_save = ['test', 'perturbed_jpeg', 'perturbed_salt']
 
+    # section: build dic
     if args.data == 'test':
         print('using cuda: {}', format(device))
         print('args.data = {}'.format(args.data))
@@ -126,10 +128,8 @@ if __name__ == '__main__':
         gt_metric_dic = {'annotations': list()}
         hp_metric_dic = {'annotations': list()}
         for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
-
             for ci in range(allcaps.shape[1]):
-
-                gt = [rev_word_map[ind.item()] for ind in allcaps[0][ci]][1:caplens[0][ci].item()-1]
+                gt = [rev_word_map[ind.item()] for ind in allcaps[0][ci]][1:caplens[0][ci].item() - 1]
                 gt_metric_dic['annotations'].append({u'image_id': i, u'caption': gt})
 
             image = image.to(device)
@@ -170,13 +170,12 @@ if __name__ == '__main__':
                 print('process : {}/{}'.format(i, len(test_loader)))
             image = image.to(device)
             _, _, _, seq_sum, words = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
-                                                         args.beam_size)
+                                                                args.beam_size)
             if not None == words:
                 hp_metric_dic['annotations'].append({u'image_id': i, u'caption': words})
 
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
-
 
     if args.data == 'perturbed_salt':
         data_path = '/yoav_stg/gshalev/image_captioning/output_folder'
@@ -205,7 +204,7 @@ if __name__ == '__main__':
                 print('process : {}/{}'.format(i, len(test_loader)))
             image = image.to(device)
             _, _, _, seq_sum, words = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
-                                                         args.beam_size)
+                                                                args.beam_size)
             if not None == words:
                 hp_metric_dic['annotations'].append({u'image_id': i, u'caption': words})
 
@@ -222,8 +221,8 @@ if __name__ == '__main__':
             if image.shape[1] != 3:
                 continue
             print('########## image shape:{}'.format(image.shape))
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
-                                                         args.beam_size)
+            _, _, _, seq_sum, _ = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+                                                            args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
@@ -236,8 +235,8 @@ if __name__ == '__main__':
             if image.shape[1] != 3:
                 continue
             print('########## image shape:{}'.format(image.shape))
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
-                                                         args.beam_size)
+            _, _, _, seq_sum, _ = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+                                                            args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
@@ -252,7 +251,7 @@ if __name__ == '__main__':
                 continue
             print('########## image shape:{}'.format(image.shape))
             _, _, _, seq_sum, words = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
-                                                         args.beam_size)
+                                                                args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
@@ -280,6 +279,7 @@ if __name__ == '__main__':
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
+    # section: save dic
     dic_name = 'pos_dic_{}_beam_{}'.format(args.data, args.beam_size)
     print('dic name: {}'.format(dic_name))
 
@@ -291,12 +291,16 @@ if __name__ == '__main__':
                 'sentence_likelihood': sentences_likelihood},
                save_data_path)
 
-    metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics')
-    if not os.path.exists(metrics_save_dir):
-        os.mkdir(metrics_save_dir)
-        print('created dir: {}'.format(metrics_save_dir))
+    # section: seva metrics
+    if args.data in metrics_data_type_to_save:
+        metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics')
+        if not os.path.exists(metrics_save_dir):
+            os.mkdir(metrics_save_dir)
+            print('created dir: {}'.format(metrics_save_dir))
 
-    metrics_result_file_name = 'metrics_results_{}_beam_{}'.format(args.data, args.beam_size)
-    torch.save({'gt':gt_metric_dic, 'hyp':hp_metric_dic}, os.path.join(metrics_save_dir, metrics_result_file_name))
-    print('Saved metrics results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
+        metrics_result_file_name = 'metrics_results_{}_beam_{}'.format(args.data, args.beam_size)
+        torch.save({'gt': gt_metric_dic, 'hyp': hp_metric_dic},
+                   os.path.join(metrics_save_dir, metrics_result_file_name))
+        print('Saved metrics results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
+
 # run_beam_search.py
