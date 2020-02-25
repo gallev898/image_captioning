@@ -57,7 +57,6 @@ best_bleu4 = 0.  # BLEU-4 score right now
 print_freq = 100  # print training/validation stats every __ batches
 
 # section: get all train caps
-# todo: debug
 if args.replace_type not in ['noun', 'verb', 'full']:
     raise Exception('replace_type must be in [noun, verb, full]')
 
@@ -67,8 +66,13 @@ if args.num_of_fake > args.batch_size:
 replace_dic_load_path = '/yoav_stg/gshalev/image_captioning/output_folder/{}_masking_train_caps'.format(
     args.replace_type) if not args.run_local else '{}_masking_train_caps'.format(args.replace_type)
 replace_dic = torch.load(replace_dic_load_path)
-noun_idx_set = torch.load('noun_idx_set' if args.run_local else '/yoav_stg/gshalev/image_captioning/output_folder/noun_idx_set')
-verb_idx_set = torch.load('verb_idx_set' if args.run_local else '/yoav_stg/gshalev/image_captioning/output_folder/verb_idx_set')
+print('successfully loades *replace_dic* from: {}'.format(replace_dic_load_path))
+noun_idx_set = torch.load(
+    'noun_idx_set' if args.run_local else '/yoav_stg/gshalev/image_captioning/output_folder/noun_idx_set')
+print('successfully loades *noun_idx_set*')
+verb_idx_set = torch.load(
+    'verb_idx_set' if args.run_local else '/yoav_stg/gshalev/image_captioning/output_folder/verb_idx_set')
+print('successfully loades *verb_idx_set*')
 
 
 def main():
@@ -239,7 +243,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
     start = time.time()
 
     # section: start batches
-    for i, (imgs, caps, caplens) in enumerate(train_loader):
+    for ei, (imgs, caps, caplens) in enumerate(train_loader):
         if len(caps) != args.batch_size:
             continue
 
@@ -269,13 +273,14 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
         fake_caps_lens = sum((torch.stack(fake_caps_lens_lst) - 1).squeeze(1)).item()
 
-        #notice: replace nouns/verbs
+        # section: replace nouns/verbs
         if args.replace_type in ['noun', 'verb']:
             for fake, pos_idx in zip(fake_caps_lst, pos_indexes):
-                random_samples = random.sample(list(noun_idx_set if args.replace_type == 'noun' else verb_idx_set), len(pos_idx))
+                random_samples = random.sample(list(noun_idx_set if args.replace_type == 'noun' else verb_idx_set),
+                                               len(pos_idx))
                 for i, pi in enumerate(pos_idx):
                     fake[pi] = random_samples[i]
-        else: # == full
+        else:  # == full
             for fake, pos_idx in zip(fake_caps_lst, pos_indexes):
                 noun_idx = pos_idx[0]
                 verb_idx = pos_idx[1]
@@ -304,18 +309,18 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         # notice: unsort because was sorted in decoder
         temp = torch.empty_like(scores)
         temp[sort_ind] = scores
-        scores = temp
+        scores = temp.to(device)
 
         # notice : 1 - prob
-        ones_for_fake_part = torch.ones(num_of_fake, scores.shape[1], scores.shape[2])
-        zeros_for_real_part = torch.zeros(len(origin_caps), scores.shape[1], scores.shape[2])
-        minus_ones_for_real_part = torch.mul(-1, torch.ones(len(origin_caps), scores.shape[1], scores.shape[2]))
+        ones_for_fake_part = torch.ones(num_of_fake, scores.shape[1], scores.shape[2]).to(device)
+        zeros_for_real_part = torch.zeros(len(origin_caps), scores.shape[1], scores.shape[2]).to(device)
+        minus_ones_for_real_part = torch.mul(-1, torch.ones(len(origin_caps), scores.shape[1], scores.shape[2])).to(device)
 
-        zeros_and_ones = torch.cat((zeros_for_real_part, ones_for_fake_part))
-        minus_ones_and_ones = torch.cat((minus_ones_for_real_part, ones_for_fake_part))
+        zeros_and_ones = torch.cat((zeros_for_real_part, ones_for_fake_part)).to(device)
+        minus_ones_and_ones = torch.cat((minus_ones_for_real_part, ones_for_fake_part)).to(device)
 
-        zeros_and_ones_minus_scors = zeros_and_ones - scores
-        scores = torch.mul(minus_ones_and_ones, zeros_and_ones_minus_scors)
+        zeros_and_ones_minus_scors = (zeros_and_ones - scores).to(device)
+        scores = torch.mul(minus_ones_and_ones, zeros_and_ones_minus_scors).to(device)
 
         ####
         # fake_prob = scores[len(origin_caps):].to(device)
@@ -323,12 +328,11 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         # one_minus_fake_prob = (ones - fake_prob).to(device)
         # scores = torch.cat((scores[:len(origin_caps)], one_minus_fake_prob)).to(device)
         ####
-        # Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
+        # notice: Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
         targets = caps[:, 1:]
         decode_lengths = (caplens - 1).squeeze(1).tolist()
 
-        # Remove timesteps that we didn't decode at, or are pads
-        # pack_padded_sequence is an easy trick to do this
+        # notice: Remove timesteps that we didn't decode at, or are pads pack_padded_sequence is an easy trick to do this
         scores = pack_padded_sequence(scores, decode_lengths, batch_first=True, enforce_sorted=False).data
         targets = pack_padded_sequence(targets, decode_lengths, batch_first=True, enforce_sorted=False).data
 
@@ -342,7 +346,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         mul_tensor = torch.cat((torch.ones(origin_caps_len), torch.cat(fake_zero_vectors))).to(device)
         loss = torch.mul(loss, mul_tensor).mean().to(device)
 
-        # Add doubly stochastic attention regularization
+        # notice: Add doubly stochastic attention regularization
         loss += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
         # Back prop.
@@ -372,12 +376,12 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         start = time.time()
 
         # section: Print status
-        if i % print_freq == 0:
+        if ei % print_freq == 0:
             print('Epoch: [{0}][{1}/{2}]\t'
                   'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Data Load Time {data_time.val:.3f} ({data_time.avg:.3f})\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                  'Top-5 Accuracy {top5.val:.3f} ({top5.avg:.3f})'.format(epoch, i, len(train_loader),
+                  'Top-5 Accuracy {top5.val:.3f} ({top5.avg:.3f})'.format(epoch, ei, len(train_loader),
                                                                           batch_time=batch_time,
                                                                           data_time=data_time, loss=losses,
                                                                           top5=top5accs))
@@ -664,4 +668,4 @@ if __name__ == '__main__':
     print('runname : {}'.format(args.runname))
     print('args.alpha : {}'.format(args.alpha))
     main()
-# unlikelihood_train_1_minus_prob.py
+# unlikelihood_train_1_minus_prob_noun_verb_replacement.py
