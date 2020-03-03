@@ -52,6 +52,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='Generate Caption')
     parser.add_argument('--model', type=str)
     parser.add_argument('--run_local', default=False, action='store_true')
+    parser.add_argument('--replace_mode', default=False, action='store_true')
     parser.add_argument('--debug', default=False, action='store_true')
     parser.add_argument('--data', default='random', type=str)
     parser.add_argument('--beam_size', default=10, type=int)

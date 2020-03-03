@@ -32,7 +32,7 @@ if not args.run_local:
     import wandb
 
 
-    wandb.init(project="image_captioning", name=args.runname)
+    wandb.init(project="image_captioning", name=args.runname, dir='/yoav_stg/gshalev/wandb')
 
 # section: Model parameters
 emb_dim = 512  # dimension of word embeddings

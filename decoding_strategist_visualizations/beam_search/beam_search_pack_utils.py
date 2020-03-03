@@ -63,7 +63,7 @@ def beam_search_decode(encoder, image, beam_size, word_map, decoder):
     h, c = decoder.init_hidden_state(encoder_out)
 
     complete_logits_list = list()  # NOTICE
-    logits_list = torch.zeros([5, 1]).to(device)  # NOTICE
+    logits_list = torch.zeros([beam_size, 1]).to(device)  # NOTICE!!!!!!!!!!!! fixed from -torch.zeros([5, 1]).to(device)- to: -torch.zeros([beam_size, 1]).to(device)-
 
     # s is a number less than or equal to k, because sequences are removed from this process once they hit <end>
     while True:

@@ -45,7 +45,7 @@ if not args.run_local:
     import wandb
 
 
-    wandb.init(project="image_captioning", name=args.runname)
+    wandb.init(project="image_captioning", name=args.runname, dir='/yoav_stg/gshalev/wandb')
 
 # Data parameters !-CONST-!
 # data_folder = '../output_folder'  # folder with data files saved by create_input_files.py

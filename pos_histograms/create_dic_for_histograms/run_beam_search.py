@@ -109,6 +109,11 @@ if __name__ == '__main__':
     encoder, decoder = get_models(model_path, device)
     word_map, rev_word_map = get_word_map(args.run_local, '../../output_folder/WORDMAP_' + data_name + '.json')
 
+    if args.replace_mode:
+        word_map['NOUN'] = 9491
+        word_map['VERB'] = 9492
+
+    print(len(word_map))
     print('create pos dic for {} data'.format(args.data))
     metrics_data_type_to_save = ['test', 'perturbed_jpeg', 'perturbed_salt']
 
