@@ -322,17 +322,27 @@ def accuracy(scores, targets, k):
 
 def get_args():
     parser = argparse.ArgumentParser(description='train')
-    parser.add_argument('--replace_type', type=str)
+    # general
     parser.add_argument('--runname', type=str)
-    parser.add_argument('--cuda', type=int, default=0)
-    parser.add_argument('--checkpoint', default=None, type=str)
-    parser.add_argument('--fine_tune_encoder', default=False, action='store_true')
-    parser.add_argument('--debug', default=False, action='store_true')
-    parser.add_argument('--fine_tune_epochs', default=-1, type=int)
-    parser.add_argument('--learning_rate', default=-1, type=float)
+    parser.add_argument('--batch_size', default=32, type=int)
+    # fixed
+    parser.add_argument('--sphere', type=int, default=0)
+    parser.add_argument('--normalize_f_x', default=False, action='store_true')
+    #unlikelihood
     parser.add_argument('--num_of_fake', default=16, type=int)
     parser.add_argument('--alpha', default=0.0, type=float)
-    parser.add_argument('--batch_size', default=32, type=int)
+
+    # replace
+    parser.add_argument('--replace_type', type=str)
+
+    # fine-tune
+    parser.add_argument('--checkpoint', default=None, type=str)
+    parser.add_argument('--fine_tune_encoder', default=False, action='store_true')
+    parser.add_argument('--fine_tune_epochs', default=-1, type=int)
+
+    parser.add_argument('--cuda', type=int, default=0)
+    parser.add_argument('--debug', default=False, action='store_true')
+    parser.add_argument('--learning_rate', default=-1, type=float)
 
     parser.add_argument('--run_local', default=False, action='store_true')
     args = parser.parse_args()

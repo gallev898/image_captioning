@@ -10,7 +10,6 @@ from utils import *
 
 # wandb login a8c4526db3e8aa11d7b2674d7c257c58313b45ca
 import time
-import argparse
 import torch.optim
 import torch.utils.data
 
@@ -20,7 +19,7 @@ import torchvision.transforms as transforms
 
 from torch import nn
 from standart_training.pack_utils import *
-from standart_training.models import Encoder, DecoderWithAttention
+from standart_training.models.models import Encoder, DecoderWithAttention
 from dataset_loader.datasets2 import *
 # from dataset_loader.datasets import *
 from torch.nn.utils.rnn import pack_padded_sequence

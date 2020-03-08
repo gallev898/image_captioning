@@ -16,7 +16,7 @@ import torchvision.transforms as transforms
 
 from torch import nn
 from standart_training.pack_utils import *
-from standart_training.fixed_models_no_attention import Encoder, DecoderWithoutAttention
+from standart_training.models.fixed_models_no_attention import Encoder, DecoderWithoutAttention
 from dataset_loader.datasets2 import *
 from torch.nn.utils.rnn import pack_padded_sequence
 from nltk.translate.bleu_score import corpus_bleu
@@ -237,7 +237,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
         # section:  Forward prop.
         imgs = encoder(imgs)
-        scores, targets, decode_lengths, _, sort_ind = decoder(imgs, caps, caplens)
+        scores, targets, decode_lengths, _, sort_ind = decoder(imgs, caps, caplens, args)
 
         # Remove timesteps that we didn't decode at, or are pads
         # pack_padded_sequence is an easy trick to do this
@@ -444,7 +444,7 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map):
             if encoder is not None:
                 imgs = encoder(imgs)
 
-            scores, caps_sorted, decode_lengths, _, sort_ind = decoder(imgs, caps, caplens)
+            scores, caps_sorted, decode_lengths, _, sort_ind = decoder(imgs, caps, caplens, args)
 
             # Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
             targets = caps_sorted[:, 1:]

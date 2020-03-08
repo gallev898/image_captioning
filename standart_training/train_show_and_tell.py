@@ -309,7 +309,7 @@ def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_m
         vocab_size = len(word_map)
         imgs = imgs.to(device)
         # # Encode
-        encoder_out = encoder(imgs).repeat(3,1).to(device)  # (1, enc_image_size, enc_image_size, encoder_dim)
+        encoder_out = encoder(imgs).repeat(k,1).to(device)  # (1, enc_image_size, enc_image_size, encoder_dim)
 
         # Tensor to store top k previous words at each step; now they're just <start>
         k_prev_words = torch.LongTensor([[word_map['<start>']]] * k).to(device)  # (k, 1)

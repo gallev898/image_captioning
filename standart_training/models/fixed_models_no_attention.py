@@ -3,6 +3,7 @@ sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 import torch
 from torch import nn
+import numpy as np
 import torch.nn.functional as F
 import torchvision
 
@@ -94,6 +95,16 @@ class Attention(nn.Module):
 
         return attention_weighted_encoding, alpha
 
+def get_embeddings(embedding_size, vocab_size):
+    word2vec_dictionary = dict()
+    for cls_idx in range(vocab_size):
+        v = np.random.randint(low=-100 , high=100, size=embedding_size)
+        v = v / np.linalg.norm(v)
+        word2vec_dictionary[cls_idx] = torch.from_numpy(v).float()
+
+    w2v_matrix = torch.stack(list(word2vec_dictionary.values()), dim=1)
+    return w2v_matrix
+
 
 class DecoderWithoutAttention(nn.Module):
     """
@@ -122,7 +133,8 @@ class DecoderWithoutAttention(nn.Module):
         self.attention = Attention(encoder_dim, decoder_dim, attention_dim)  # attention network
 
         self.embedding = nn.Embedding(vocab_size, embed_dim)  # embedding layer
-        self.representations = torch.rand((self.embedding.weight.data.transpose(0, 1).shape))
+        self.representations = get_embeddings(encoder_dim, vocab_size)
+        # self.representations = torch.rand((self.embedding.weight.data.transpose(0, 1).shape))
         self.representations.requires_grad = False
         self.representations = self.representations.to(device)
         self.dropout = nn.Dropout(p=self.dropout)
@@ -175,7 +187,7 @@ class DecoderWithoutAttention(nn.Module):
         # c = self.init_c(mean_encoder_out)
         return h, c
 
-    def forward(self, encoder_out, encoded_captions, caption_lengths):
+    def forward(self, encoder_out, encoded_captions, caption_lengths, args):
         """
         Forward propagation.
 
@@ -218,7 +230,12 @@ class DecoderWithoutAttention(nn.Module):
                 current_input = embeddings[:batch_size_t, t, :]
 
             h, c = self.decode_step(current_input, (hidden_state, cell_state))  # (batch_size_t, decoder_dim)
+            if args.normalize_f_x:
+                h = h / np.linalg.norm(h.cpu().detach())
+                h = h.to(self.device)
             preds = torch.matmul(h, self.representations).to(self.device)
+            if args.sphere > 0:
+                preds *= args.sphere
             predictions[:batch_size_t, t+1, :] = preds
 
         return predictions, encoded_captions, decode_lengths, None, sort_ind

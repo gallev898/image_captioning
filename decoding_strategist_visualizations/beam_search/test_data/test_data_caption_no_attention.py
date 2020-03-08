@@ -7,7 +7,7 @@ sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 from dataset_loader.datasets import CaptionDataset
 from utils import *
 from decoding_strategist_visualizations.decoding_strategist_utils import *
-from decoding_strategist_visualizations.beam_search.beam_search_pack_utils import *
+from decoding_strategist_visualizations.beam_search.beam_search_pack_utils_no_attention import *
 
 import torch
 import en_core_web_sm
@@ -34,8 +34,11 @@ def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, sa
     # Image needs to be clipped between 0 and 1 or it looks like noise when displayed
     image = np.clip(image, 0, 1)
 
-    words = [rev_word_map[ind] for ind in seq]
-
+    for s in seq:
+        words = [rev_word_map[ind.item()] for ind in s]
+        print(' '.join(words))
+    print('------------')
+    return
     nlp = en_core_web_sm.load()
     doc = nlp(' '.join(words[1:-1]))
     pos = [x.pos_ for x in doc]
@@ -43,41 +46,18 @@ def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, sa
     pos.insert(len(pos), '-')
 
     top_seq_total_scors_exp = np.exp(top_seq_total_scors)
-    return visualization(image, alphas, words, pos, top_seq_total_scors, top_seq_total_scors_exp, smooth, save_dir,
-                         image_name)
+    print(words)
+    # return visualization(image, None, words, pos, top_seq_total_scors, top_seq_total_scors_exp, smooth, save_dir,
+    #                      image_name)
 
 
 def run(encoder, decoder, word_map, rev_word_map, save_dir, image_path, image_name):
-    seq, alphas, top_seq_total_scors, seq_sum, logits_list = beam_search_decode(encoder, image_path, args.beam_size,
-                                                                                word_map, decoder, args)
+    seq, _, top_seq_total_scors, seq_sum, logits_list = beam_search_decode(encoder, image, args.beam_size,
+                                                                                word_map, decoder)
 
-    if args.show_all_beam:
-        image = image_path.squeeze(0)
-        image = image.numpy()
+    # alphas = torch.FloatTensor(alphas)
 
-        image = image.transpose((1, 2, 0))
-
-        # Undo preprocessing
-        mean = np.array([0.485, 0.456, 0.406])
-        std = np.array([0.229, 0.224, 0.225])
-        image = std * image + mean
-
-        # Image needs to be clipped between 0 and 1 or it looks like noise when displayed
-        image = np.clip(image, 0, 1)
-        plt.imshow(image)
-        plt.show()
-
-        for s, ss in zip(seq, top_seq_total_scors):
-            words = [rev_word_map[ind] for ind in s]
-            print(' '.join(words))
-            print(ss)
-            print(sum(ss))
-        print('---------------')
-        return
-
-    alphas = torch.FloatTensor(alphas)
-
-    visualize_att(image_path[0], seq, alphas, rev_word_map, top_seq_total_scors, save_dir, image_name, args.smooth)
+    visualize_att(image_path[0], seq, None, rev_word_map, top_seq_total_scors, save_dir, image_name, args.smooth)
 
     f = open(os.path.join(save_dir, 'seq_sum.txt'), 'a+')
     f.write('seq_sum: {}    for image with caption: {}\n'.format(seq_sum, image_name))
