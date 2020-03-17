@@ -51,15 +51,16 @@ def get_model_path_and_save_dir(args, save_dir_name):
 def get_args():
     parser = argparse.ArgumentParser(description='Generate Caption')
     parser.add_argument('--model', type=str)
+    parser.add_argument('--data', default='random', type=str)
+    parser.add_argument('--beam_size', default=10, type=int)
+    parser.add_argument('--top_k', default=0, type=int)
+    parser.add_argument('--top_p', default=0.0, type=float)
+    parser.add_argument('--cuda', default=0, type=int)
+
     parser.add_argument('--run_local', default=False, action='store_true')
     parser.add_argument('--replace_mode', default=False, action='store_true')
     parser.add_argument('--debug', default=False, action='store_true')
-    parser.add_argument('--data', default='random', type=str)
-    parser.add_argument('--beam_size', default=10, type=int)
-    parser.add_argument('--cuda', default=0, type=int)
     parser.add_argument('--random_range', default=5, type=int)
-    parser.add_argument('--top_k', default=0, type=int)
-    parser.add_argument('--top_p', default=0.0, type=float)
     args = parser.parse_args()
     return args
 

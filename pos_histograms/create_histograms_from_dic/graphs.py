@@ -5,7 +5,8 @@ import os
 
 
 if __name__ == '__main__':
-    model_name = 'unlikelihood_1_minus_prob_16_16'
+    attention_model = False
+    model_name = 'train_show_and_tell'
     dics_path = '../create_dic_for_histograms/pos_dic/{}/pos_dic'.format(model_name)
 
     for dic_name in os.listdir(dics_path):
@@ -44,13 +45,21 @@ if __name__ == '__main__':
 
         avg = {}
         for k in pos_dic.keys():
-            avg[k] = {exp_or_prop: np.average(pos_dic[k][exp_or_prop]),
-                      # avg[k] = {'exp': np.average(pos_dic[k]['exp']),
-                      'logits': np.average(pos_dic[k]['logits']),
-                      'alphas_max': np.average(pos_dic[k]['alphas_max']),
-                      'alphas_var': np.average(pos_dic[k]['alphas_var']),
-                      'count': len(pos_dic[k][exp_or_prop])
-                      }
+            if attention_model:
+                avg[k] = {exp_or_prop: np.average(pos_dic[k][exp_or_prop]),
+                          # avg[k] = {'exp': np.average(pos_dic[k]['exp']),
+                          'logits': np.average(pos_dic[k]['logits']),
+                          'alphas_max': np.average(pos_dic[k]['alphas_max']),
+                          'alphas_var': np.average(pos_dic[k]['alphas_var']),
+                          'count': len(pos_dic[k][exp_or_prop])
+                          }
+            else:
+                avg[k] = {exp_or_prop: np.average(pos_dic[k][exp_or_prop]),
+                          # avg[k] = {'exp': np.average(pos_dic[k]['exp']),
+                          'logits': np.average(pos_dic[k]['logits']),
+                          'count': len(pos_dic[k][exp_or_prop])
+                          }
+
 
             # section: POS prop
             plt.clf()
@@ -86,16 +95,17 @@ if __name__ == '__main__':
         plt.title('count')
         plt.savefig(os.path.join(save_dir, plt.gca().get_title()))
 
-        plt.clf()
-        alphas = [(avg[k]['alphas_max'], k) for k in list(avg.keys()) if k in filterd_keys]
-        plt.bar([x[1] for x in alphas], [x[0] for x in alphas], color='orange')
-        plt.title('alphas max avg')
-        plt.savefig(os.path.join(save_dir, plt.gca().get_title()))
+        if attention_model:
+            plt.clf()
+            alphas = [(avg[k]['alphas_max'], k) for k in list(avg.keys()) if k in filterd_keys]
+            plt.bar([x[1] for x in alphas], [x[0] for x in alphas], color='orange')
+            plt.title('alphas max avg')
+            plt.savefig(os.path.join(save_dir, plt.gca().get_title()))
 
-        plt.clf()
-        alphas = [(avg[k]['alphas_var'], k) for k in list(avg.keys()) if k in filterd_keys]
-        plt.bar([x[1] for x in alphas], [x[0] for x in alphas], color='brown')
-        plt.title('alphas var avg')
-        plt.savefig(os.path.join(save_dir, plt.gca().get_title()))
+            plt.clf()
+            alphas = [(avg[k]['alphas_var'], k) for k in list(avg.keys()) if k in filterd_keys]
+            plt.bar([x[1] for x in alphas], [x[0] for x in alphas], color='brown')
+            plt.title('alphas var avg')
+            plt.savefig(os.path.join(save_dir, plt.gca().get_title()))
 
         d = 0

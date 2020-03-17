@@ -30,7 +30,7 @@ device = torch.device("cuda:{}".format(args.cuda) if torch.cuda.is_available() e
 
 def caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, beam_size):
     seq, _, top_seq_total_scors, seq_sum, logits_list = beam_search_decode(encoder, image, beam_size, word_map,
-                                                                                decoder)
+                                                                                decoder, device)
 
     if seq == None:
         return None, None, None, None, None
@@ -279,7 +279,7 @@ if __name__ == '__main__':
             # Encode
             image = image.unsqueeze(0)  # (1, 3, 256, 256)
 
-            _, _, _, seq_sum = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+            _, _, _, seq_sum, _ = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
                                                          args.beam_size)
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)

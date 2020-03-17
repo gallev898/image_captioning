@@ -21,7 +21,7 @@ def get_args():
     return args
 
 # global
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 data_name = 'coco_5_cap_per_img_5_min_word_freq'
 filename = 'BEST_checkpoint_' + data_name + '.pth.tar'
 

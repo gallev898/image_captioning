@@ -1,6 +1,6 @@
 import sys
 
-from decoding_strategist.top_k_top_p_captions.top_k_p_pack_utils import caption_image
+from decoding_strategist_visualizations.top_k_top_p_captions.top_k_p_pack_utils import caption_image
 
 
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
@@ -8,8 +8,8 @@ sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 from PIL import Image
 from scipy.misc import imread, imresize
-from decoding_strategist.decoding_strategist_utils import *
-from decoding_strategist.beam_search.beam_search_pack_utils import *
+from decoding_strategist_visualizations.decoding_strategist_utils import *
+from decoding_strategist_visualizations.beam_search.beam_search_pack_utils import *
 
 import os
 import torch
@@ -53,16 +53,16 @@ def run(encoder, decoder, word_map, rev_word_map, save_dir, image_path, image_ti
 
     img = img.transpose(2, 0, 1)
     img = img / 255.
-    img = torch.FloatTensor(img).to(device)
+    img = torch.FloatTensor(img).to('cpu')
 
     transform = transforms.Compose([data_normalization])
     image = transform(img)  # (3, 256, 256)
 
     seq, alphas, top_seq_total_scors, seqs_scores_logits = caption_image(encoder,
                                                                          decoder,
-                                                                         image,
+                                                                         image.unsqueeze(0),
                                                                          word_map,
-                                                                         top_k, top_p)
+                                                                         top_k, top_p, 'cpu')
     seq, alphas, top_seq_total_scors, seq_sum, logits_list = beam_search_decode(encoder, image.unsqueeze(0), args.beam_size, word_map, decoder)
     # seq, alphas, top_seq_total_scors, seq_sum, logits_list = caption_image(encoder,
     #                                                                        decoder,
@@ -88,7 +88,7 @@ if __name__ == '__main__':
 
     model_path, save_dir = get_model_path_and_save_path(args, save_dir_name)
 
-    encoder, decoder = get_models(model_path)
+    encoder, decoder = get_models(model_path, 'cpu')
 
     word_map, rev_word_map = get_word_map()
 

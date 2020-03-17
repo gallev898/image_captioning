@@ -34,9 +34,11 @@ def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, sa
     # Image needs to be clipped between 0 and 1 or it looks like noise when displayed
     image = np.clip(image, 0, 1)
 
-    for s in seq:
-        words = [rev_word_map[ind.item()] for ind in s]
-        print(' '.join(words))
+    # for s in seq:
+    #     words = [rev_word_map[ind.item()] for ind in s]
+    #     print(' '.join(words))
+    words = [rev_word_map[ind] for ind in seq]
+    print(' '.join(words))
     print('------------')
     return
     nlp = en_core_web_sm.load()
@@ -53,7 +55,7 @@ def visualize_att(image_path, seq, alphas, rev_word_map, top_seq_total_scors, sa
 
 def run(encoder, decoder, word_map, rev_word_map, save_dir, image_path, image_name):
     seq, _, top_seq_total_scors, seq_sum, logits_list = beam_search_decode(encoder, image, args.beam_size,
-                                                                                word_map, decoder)
+                                                                                word_map, decoder, device)
 
     # alphas = torch.FloatTensor(alphas)
 

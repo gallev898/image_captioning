@@ -298,7 +298,9 @@ def adjust_learning_rate(optimizer, shrink_factor):
 
     print("\nDECAYING learning rate.")
     for param_group in optimizer.param_groups:
+        lr_befor_update = param_group['lr']
         param_group['lr'] = param_group['lr'] * shrink_factor
+        print('LR before: {} LR after: {}'.format(lr_befor_update, param_group['lr']))
     print("The new learning rate is %f\n" % (optimizer.param_groups[0]['lr'],))
 
 
@@ -325,6 +327,8 @@ def get_args():
     # general
     parser.add_argument('--runname', type=str)
     parser.add_argument('--batch_size', default=32, type=int)
+    #cosine
+    parser.add_argument('--cosine', default=False, action='store_true')
     # fixed
     parser.add_argument('--sphere', type=int, default=0)
     parser.add_argument('--normalize_f_x', default=False, action='store_true')

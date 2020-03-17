@@ -13,7 +13,7 @@ import torch
 import torchvision.transforms as transforms
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 desktop_path = os.path.join(os.path.join(os.path.expanduser('~')), 'Desktop')
 data_name = 'coco_5_cap_per_img_5_min_word_freq'
 filename = 'BEST_checkpoint_' + data_name + '.pth.tar'
