@@ -14,7 +14,7 @@ import torchvision.transforms as transforms
 
 from torch import nn
 from standart_training.pack_utils import *
-from standart_training.models.fixed_models_no_attention import Encoder, DecoderWithoutAttention, get_embeddings
+from standart_training.fixed_models_no_attention import Encoder, DecoderWithoutAttention, get_embeddings
 from dataset_loader.datasets2 import *
 from torch.nn.utils.rnn import pack_padded_sequence
 from nltk.translate.bleu_score import corpus_bleu
@@ -82,7 +82,7 @@ def main():
     representations = get_embeddings(decoder_dim, len(word_map)).to(device)
 
     # section: cosine
-    if args.cosine:
+    if not args.fixed:
         representations.requires_grad = True
 
     # section: Initialization
@@ -97,8 +97,9 @@ def main():
 
         decoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, decoder.parameters()),
                                              lr=decoder_lr)
-        if args.cosine:
+        if not args.fixed:
             decoder_optimizer.add_param_group({'params': representations})
+
         encoder = Encoder()
         #notice: fine to encoder
         encoder.fine_tune(True if args.fine_tune_encoder and args.fine_tune_epochs == 0 else False)
@@ -196,7 +197,7 @@ def main():
 
         print('9999999999999- recent blue {}'.format(recent_bleu4))
         print('--------------3333333333-----------Start val without teacher forcing----------epoch-{}'.format(epoch))
-        caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map)
+        caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map, representations)
         print('!@#!@!#!#@!#@!#@ DONE WITH TRAIN VAL AND VAL WITHOUT TEACHER FORCING FOR EPOCH :{}'.format(epoch))
 
         # section: save model if there was an improvement
@@ -209,7 +210,7 @@ def main():
             epochs_since_improvement = 0
 
         save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
-                        decoder_optimizer, recent_bleu4, is_best, args.runname)
+                        decoder_optimizer, recent_bleu4, is_best, representations, args.runname)
 
 
 def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch, representations):
@@ -291,7 +292,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
                            "Test Loss": losses.avg})
 
 
-def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_map, beam_size=3):
+def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_map, representations, beam_size=3):
 
     for i, (imgs, caps, caplens, allcaps) in enumerate(val_loader):
         if i > 100 or (args.debug and i > 2):
@@ -333,8 +334,16 @@ def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_m
             else:
                 h, c = decoder.decode_step(embeddings, (h, c))  # (s, decoder_dim)
 
-            scores = decoder.fc(h)  # (s, vocab_size)
-            scores = F.log_softmax(scores, dim=1)
+            if args.cosine:
+                h = F.normalize(h, dim=1, p=2)
+                representations = F.normalize(representations, dim=0, p=2)
+            scores = torch.matmul(h, representations).to(device)
+
+            if args.sphere > 0:
+                scores *= args.sphere
+
+            # scores = decoder.fc(h)  # (s, vocab_size)
+            # scores = F.log_softmax(scores, dim=1)
             scores_copy = scores.clone()
 
             # Add
@@ -424,6 +433,7 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map, representati
             # section: Forward prop.
             if encoder is not None:
                 imgs = encoder(imgs)
+
             scores, caps_sorted, decode_lengths, _, sort_ind = decoder(imgs, caps, caplens, args, representations)
 
             # notice: Since we decoded starting with <start>, the targets are all words after <start>, up to <end>

@@ -19,7 +19,7 @@ from utils import get_word_map, data_normalization
 from torch.nn.utils.rnn import pack_padded_sequence
 from standart_training.pack_utils import *
 from dataset_loader.datasets2 import *
-from standart_training.models.models import Encoder, DecoderWithAttention
+from standart_training.models import Encoder, DecoderWithAttention
 from nltk.translate.bleu_score import corpus_bleu
 
 

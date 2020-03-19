@@ -16,15 +16,15 @@ def encode(encoder, image, beam_size, word_map, device):
     # Encode - return the output of resnet as 2048 channels
     encoder_out = encoder(image)  # (1, enc_image_size, enc_image_size, encoder_dim)
 
-    enc_image_size = encoder_out.size(1)
-    encoder_dim = encoder_out.size(1)
+    # enc_image_size = encoder_out.size(1)
+    # encoder_dim = encoder_out.size(1)
 
     # Flatten encoding
-    encoder_out = encoder_out.view(1, -1, encoder_dim)  # (1, num_pixels, encoder_dim)
-    num_pixels = encoder_out.size(1)  # num of pixels in each
+    # encoder_out = encoder_out.view(1, -1, encoder_dim)  # (1, num_pixels, encoder_dim)
+    # num_pixels = encoder_out.size(1)  # num of pixels in each
 
     # We'll treat the problem as having a batch size of k
-    encoder_out = encoder_out.expand(beam_size, num_pixels, encoder_dim)  # (k, num_pixels, encoder_dim)
+    encoder_out = encoder_out.expand(5,512)  # (k, num_pixels, encoder_dim)
 
     # Tensor to store top k previous words at each step; now they're just <start>
     k_prev_words = torch.LongTensor([[word_map['<start>']]] * beam_size).to(device)  # (k, 1)
@@ -39,17 +39,18 @@ def encode(encoder, image, beam_size, word_map, device):
     # Tensor to store top k sequences' alphas; now they're just 1s
     # seqs_alpha = torch.ones(beam_size, 1, enc_image_size, enc_image_size).to(device)  # NOTICE: for visualization
 
-    return encoder_out, enc_image_size, k_prev_words, seqs, seqs_scores, top_k_scores, None
+    return encoder_out, None, k_prev_words, seqs, seqs_scores, top_k_scores, None
 
 
 def beam_search_decode(encoder, image, beam_size, word_map, decoder, device):
     vocab_size = len(word_map)
 
     # Encode
-    encoder_out, enc_image_size, k_prev_words, seqs, seqs_scores, top_k_scores, _ = encode(encoder, image,
+    #encoder_out, None, k_prev_words, seqs, seqs_scores, top_k_scores, None
+    encoder_out, _, k_prev_words, seqs, seqs_scores, top_k_scores, _ = encode(encoder, image,
                                                                                                     beam_size,
                                                                                                     word_map, device)
-    encoder_out = encoder_out.squeeze(1)
+    # encoder_out = encoder_out.squeeze(1)
     uncompleted_seq = 0
 
     # Lists to store completed sequences, their alphas and scores

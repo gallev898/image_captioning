@@ -13,25 +13,25 @@ class Encoder(nn.Module):
     Encoder.
     """
 
-    def __init__(self, encoded_image_size=14, trained_NLI):
+    def __init__(self, embeded_dim=512):
         super(Encoder, self).__init__()
-        self.enc_image_size = encoded_image_size
+        # self.enc_image_size = encoded_image_size
 
         print('loading pre trained resnet')
-        # resnet = torchvision.models.resnet101(pretrained=True)  # pretrained ImageNet ResNet-101
+        resnet = torchvision.models.resnet101(pretrained=True)  # pretrained ImageNet ResNet-101
 
         # Remove linear and pool layers (since we're not doing classification)
         # modules = list(resnet.children())[:-2]
         # self.resnet = nn.Sequential(*modules)
-        self.trained_NLI = trained_NLI
+        self.resnet = resnet
 
         # !!! Resize image to fixed size to allow input images of variable size
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((encoded_image_size, encoded_image_size))
+        # self.adaptive_pool = nn.AdaptiveAvgPool2d((encoded_image_size, encoded_image_size))
+        self.linear = nn.Linear(1000, embeded_dim)  # linear layer to transform encoded image
 
         self.fine_tune()
 
     def forward(self, images):
-
         """
         Forward propagation.
 
@@ -39,8 +39,9 @@ class Encoder(nn.Module):
         :return: encoded images
         """
         out = self.resnet(images)  # (batch_size, 2048, image_size/32, image_size/32)
-        out = self.adaptive_pool(out)  # (batch_size, 2048, encoded_image_size, encoded_image_size)
-        out = out.permute(0, 2, 3, 1)  # (batch_size, encoded_image_size, encoded_image_size, 2048)
+        # out = self.adaptive_pool(out)  # (batch_size, 2048, encoded_image_size, encoded_image_size)
+        # out = out.permute(0, 2, 3, 1)  # (batch_size, encoded_image_size, encoded_image_size, 2048)
+        out = self.linear(out)
         return out  # TODO: WHY?? permute(0, 3, 2, 1)- try this see if somthing change
 
     def fine_tune(self, fine_tune=True):
@@ -93,12 +94,13 @@ class Attention(nn.Module):
         return attention_weighted_encoding, alpha
 
 
-class DecoderWithAttention(nn.Module):
+class DecoderWithoutAttention(nn.Module):
     """
     Decoder.
     """
 
-    def __init__(self, attention_dim, embed_dim, decoder_dim, vocab_size, device, encoder_dim=2048, dropout=0.5):
+    def __init__(self, attention_dim, embed_dim, decoder_dim, vocab_size, device, encoder_dim=512, dropout=0.5):
+    # def __init__(self, attention_dim, embed_dim, decoder_dim, vocab_size, device, encoder_dim=2048, dropout=0.5):
         """
         :param attention_dim: size of attention network
         :param embed_dim: embedding size
@@ -107,7 +109,7 @@ class DecoderWithAttention(nn.Module):
         :param encoder_dim: feature size of encoded images
         :param dropout: dropout
         """
-        super(DecoderWithAttention, self).__init__()
+        super(DecoderWithoutAttention, self).__init__()
 
         self.encoder_dim = encoder_dim
         self.attention_dim = attention_dim
@@ -120,7 +122,8 @@ class DecoderWithAttention(nn.Module):
 
         self.embedding = nn.Embedding(vocab_size, embed_dim)  # embedding layer
         self.dropout = nn.Dropout(p=self.dropout)
-        self.decode_step = nn.LSTMCell(embed_dim + encoder_dim, decoder_dim, bias=True)  # decoding LSTMCell
+        self.decode_step = nn.LSTMCell(embed_dim, decoder_dim, bias=True)  # decoding LSTMCell
+        # self.decode_step = nn.LSTMCell(embed_dim + encoder_dim, decoder_dim, bias=True)  # decoding LSTMCell
         self.init_h = nn.Linear(encoder_dim, decoder_dim)  # linear layer to find initial hidden state of LSTMCell
         self.init_c = nn.Linear(encoder_dim, decoder_dim)  # linear layer to find initial cell state of LSTMCell
         self.f_beta = nn.Linear(decoder_dim, encoder_dim)  # linear layer to create a sigmoid-activated gate
@@ -161,9 +164,11 @@ class DecoderWithAttention(nn.Module):
         :param encoder_out: encoded images, a tensor of dimension (batch_size, num_pixels, encoder_dim)
         :return: hidden state, cell state
         """
-        mean_encoder_out = encoder_out.mean(dim=1) # הדבר הזה מוריד מימד! לחשוב רגע, יש לי מטריצה ואני צריכה לתת לLSTM וקטור ולכן אני ממצעת את הייצוג של כל פיקסל זה עדיף מאשר להוריד מימד ולתת וקטור ממש ממש ארוך 2048*196
-        h = self.init_h(mean_encoder_out)  # (batch_size, decoder_dim)
-        c = self.init_c(mean_encoder_out)
+        # mean_encoder_out = encoder_out.mean(dim=1) # הדבר הזה מוריד מימד! לחשוב רגע, יש לי מטריצה ואני צריכה לתת לLSTM וקטור ולכן אני ממצעת את הייצוג של כל פיקסל זה עדיף מאשר להוריד מימד ולתת וקטור ממש ממש ארוך 2048*196
+        h = self.init_h(encoder_out)  # (batch_size, decoder_dim)
+        # h = self.init_h(mean_encoder_out)  # (batch_size, decoder_dim)
+        c = self.init_c(encoder_out)
+        # c = self.init_c(mean_encoder_out)
         return h, c
 
     def forward(self, encoder_out, encoded_captions, caption_lengths):
@@ -177,16 +182,11 @@ class DecoderWithAttention(nn.Module):
         """
 
         batch_size = encoder_out.size(0)
-        encoder_dim = encoder_out.size(-1)
         vocab_size = self.vocab_size
 
-        # Flatten image
-        encoder_out = encoder_out.view(batch_size, -1, encoder_dim)  # (batch_size, num_pixels, encoder_dim) # TODO: WHY??
-        num_pixels = encoder_out.size(1)
-
-        # Sort input data by decreasing lengths; why? apparent below
+        # section: Sort input data by decreasing lengths
         caption_lengths, sort_ind = caption_lengths.squeeze(1).sort(dim=0, descending=True)
-        encoder_out = encoder_out[sort_ind]
+        encoder_out = encoder_out[sort_ind].to(self.device)
         encoded_captions = encoded_captions[sort_ind]
 
         # Embedding
@@ -194,39 +194,29 @@ class DecoderWithAttention(nn.Module):
 
         # Initialize LSTM state
         h, c = self.init_hidden_state(encoder_out)  # (batch_size, decoder_dim) # TODO: WHY??
+        h = torch.zeros(h.shape).to(self.device)
+        c = torch.zeros(c.shape).to(self.device)
 
-        # We won't decode at the <end> position, since we've finished generating as soon as we generate <end>
-        # So, decoding lengths are actual lengths - 1
-        decode_lengths = (caption_lengths - 1).tolist()
+        decode_lengths = (caption_lengths).tolist()
 
         # Create tensors to hold word predicion scores and alphas
         predictions = torch.zeros(batch_size, max(decode_lengths), vocab_size).to(self.device)
-        alphas = torch.zeros(batch_size, max(decode_lengths), num_pixels).to(self.device)
 
-        # At each time-step, decode by
-        # attention-weighing the encoder's output based on the decoder's previous hidden state output
-        # then generate a new word in the decoder with the previous word and the attention weighted encoding
-        for t in range(max(decode_lengths)):
+        for t in range(-1, max(decode_lengths)-1):
 
             batch_size_t = sum([l > t for l in decode_lengths])
-
-            # encode_out and hidden_state that has the length of num of examples that reached this t
-            enc_out = encoder_out[:batch_size_t]
             hidden_state = h[:batch_size_t]
             cell_state = c[:batch_size_t]
 
-            attention_weighted_encoding, alpha = self.attention(enc_out, hidden_state) #עושים אטנשיין עם ההידן האחרון וכל  אחד מהחלקים בתמונה
+            if t == -1:
+                current_input = encoder_out.to(self.device)
+            else:
+                current_input = embeddings[:batch_size_t, t, :]
 
-            gate = self.sigmoid(self.f_beta(hidden_state))  # gating scalar, (batch_size_t, encoder_dim) TODO: this is bla bla
-            attention_weighted_encoding = gate * attention_weighted_encoding #  TODO: this is bla bla  -  motivated by dropout "like" - type of regularization, gate of [0,1] because of sigmoid
-
-            current_input = embeddings[:batch_size_t, t, :]
-            the_concatinantion_of_att_and_the_input_word = torch.cat([current_input, attention_weighted_encoding], dim=1)
-
-            #insert to decoder block
-            h, c = self.decode_step(the_concatinantion_of_att_and_the_input_word, (hidden_state, cell_state))  # (batch_size_t, decoder_dim)
+            h, c = self.decode_step(current_input, (hidden_state, cell_state))  # (batch_size_t, decoder_dim)
             preds = self.fc(self.dropout(h))  # (batch_size_t, vocab_size)
-            predictions[:batch_size_t, t, :] = preds
-            alphas[:batch_size_t, t, :] = alpha
+            predictions[:batch_size_t, t+1, :] = preds
 
-        return predictions, encoded_captions, decode_lengths, alphas, sort_ind
+        return predictions, encoded_captions, decode_lengths, None, sort_ind
+
+# models_no_attention.py

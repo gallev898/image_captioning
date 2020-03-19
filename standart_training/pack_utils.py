@@ -226,7 +226,7 @@ def clip_gradient(optimizer, grad_clip):
 
 
 def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer, decoder_optimizer,
-                    bleu4, is_best, runname=None):
+                    bleu4, is_best, representations=None, runname=None):
     """
     Saves model checkpoint.
 
@@ -243,6 +243,7 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
     state = {'epoch': epoch,
              'epochs_since_improvement': epochs_since_improvement,
              'bleu-4': bleu4,
+             'representations': representations,
              'encoder': encoder,
              'decoder': decoder,
              'encoder_optimizer': encoder_optimizer,
@@ -332,6 +333,7 @@ def get_args():
     # fixed
     parser.add_argument('--sphere', type=int, default=0)
     parser.add_argument('--normalize_f_x', default=False, action='store_true')
+    parser.add_argument('--fixed', default=False, action='store_true')
     #unlikelihood
     parser.add_argument('--num_of_fake', default=16, type=int)
     parser.add_argument('--alpha', default=0.0, type=float)
