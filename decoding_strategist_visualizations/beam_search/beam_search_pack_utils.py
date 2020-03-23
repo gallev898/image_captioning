@@ -12,8 +12,7 @@ import torch.nn.functional as F
 from utils import *
 
 
-def encode(encoder, image, beam_size, word_map):
-    device = 'cpu'
+def encode(encoder, image, beam_size, word_map, device):
     # Encode - return the output of resnet as 2048 channels
     encoder_out = encoder(image)  # (1, enc_image_size, enc_image_size, encoder_dim)
 
@@ -43,13 +42,12 @@ def encode(encoder, image, beam_size, word_map):
     return encoder_out, enc_image_size, k_prev_words, seqs, seqs_scores, top_k_scores, seqs_alpha
 
 
-def beam_search_decode(encoder, image, beam_size, word_map, decoder, args):
+def beam_search_decode(encoder, image, beam_size, word_map, decoder, device, args):
     vocab_size = len(word_map)
-    device = 'cpu'
     # Encode
     encoder_out, enc_image_size, k_prev_words, seqs, seqs_scores, top_k_scores, seqs_alpha = encode(encoder, image,
                                                                                                     beam_size,
-                                                                                                    word_map)
+                                                                                                    word_map, device)
 
     uncompleted_seq = 0
 

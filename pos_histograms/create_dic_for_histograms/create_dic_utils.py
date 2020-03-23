@@ -58,6 +58,7 @@ def get_args():
     parser.add_argument('--cuda', default=0, type=int)
 
     parser.add_argument('--run_local', default=False, action='store_true')
+    parser.add_argument('--show_all_beam', default=False, action='store_true')
     parser.add_argument('--replace_mode', default=False, action='store_true')
     parser.add_argument('--debug', default=False, action='store_true')
     parser.add_argument('--random_range', default=5, type=int)

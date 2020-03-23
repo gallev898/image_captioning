@@ -1,20 +1,16 @@
 import sys
 
-
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 from dataset_loader.datasets import CaptionDataset
-from utils import *
 from decoding_strategist_visualizations.decoding_strategist_utils import *
 from decoding_strategist_visualizations.beam_search.beam_search_pack_utils_show_and_tell import *
 
 import torch
-import en_core_web_sm
 
 import numpy as np
 import torchvision.transforms as transforms
-
 
 args = get_args()
 device = torch.device("cuda:{}".format(args.cuda) if torch.cuda.is_available() else "cpu")
@@ -26,12 +22,12 @@ def visualize_att(image_path, seq, rev_word_map):
 
     image = image.transpose((1, 2, 0))
 
-    # Undo preprocessing
+    # notice: Undo preprocessing
     mean = np.array([0.485, 0.456, 0.406])
     std = np.array([0.229, 0.224, 0.225])
     image = std * image + mean
 
-    # Image needs to be clipped between 0 and 1 or it looks like noise when displayed
+    # notice: Image needs to be clipped between 0 and 1 or it looks like noise when displayed
     image = np.clip(image, 0, 1)
 
     plt.imshow(image)
@@ -44,8 +40,8 @@ def run(encoder, decoder, word_map, rev_word_map, image_path, image_name, repres
     seq, _, top_seq_total_scors, seq_sum, logits_list = beam_search_decode(encoder, image, args.beam_size,
                                                                            word_map, decoder, device, representations)
 
-    # alphas = torch.FloatTensor(alphas)
     print(top_seq_total_scors)
+    print(np.exp(top_seq_total_scors))
     visualize_att(image_path[0], seq, rev_word_map)
 
     f = open(os.path.join('.', 'seq_sum.txt'), 'a+')
@@ -84,22 +80,24 @@ if __name__ == '__main__':
     # section: data loader
     test_loader = torch.utils.data.DataLoader(
         CaptionDataset('../../../output_folder', data_name, 'TEST', transform=transforms.Compose([data_normalization])),
-        batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
+        batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
 
     modelA_path, modelB_path = get_model_path_and_save_path(args.modelA, args.modelB)
 
-    # Load model
+    # section: Load model
     encoderA, decoderA, representationsA = get_models(modelA_path, device)
     encoderB, decoderB, representationsB = get_models(modelB_path, device)
 
-    assert representationsA.requires_grad == True #train_show_and_tell_dotproduct
-    assert representationsB.requires_grad == False #train_show_and_tell_fixed_dotproduct
+    assert representationsA.requires_grad == True  # notice: train_show_and_tell_dotproduct
+    assert representationsB.requires_grad == False  # notice: train_show_and_tell_fixed_dotproduct
 
     for i, (image, caps, caplens, allcaps) in enumerate(test_loader):
         if i > 50:
             break
+        # if i % 5 != 0:
+        #     continue
 
-        print('---------------------- G T ---------------------------------------')
+        print('{}---------------------- G T ---------------------------------------'.format(i))
         caps_ = [rev_word_map[x.item()] for x in caps[0]]
         ind = caps_.index('<end>')
         name = ' '.join(caps_[1:ind])

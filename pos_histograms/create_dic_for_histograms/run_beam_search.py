@@ -30,7 +30,7 @@ device = torch.device("cuda:{}".format(args.cuda) if torch.cuda.is_available() e
 
 def caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, beam_size):
     seq, alphas, top_seq_total_scors, seq_sum, logits_list = beam_search_decode(encoder, image, beam_size, word_map,
-                                                                                decoder)
+                                                                                decoder, device, args)
 
     if seq == None:
         return None, None, None, None, None
@@ -127,12 +127,15 @@ if __name__ == '__main__':
 
         test_loader = torch.utils.data.DataLoader(
             CaptionDataset(coco_data, data_name, 'TEST', transform=transforms.Compose([data_normalization])),
-            batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
+            batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
         print('lev test_loader: {}'.format(len(test_loader)))
 
         gt_metric_dic = {'annotations': list()}
         hp_metric_dic = {'annotations': list()}
-        for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
+
+        enumerator = enumerate(test_loader)
+        for i, (image, caps, caplens, allcaps) in tqdm(enumerator):
+            [next(enumerator, None) for _ in range(4)]
             for ci in range(allcaps.shape[1]):
                 gt = [rev_word_map[ind.item()] for ind in allcaps[0][ci]][1:caplens[0][ci].item() - 1]
                 gt_metric_dic['annotations'].append({u'image_id': i, u'caption': gt})
@@ -143,7 +146,7 @@ if __name__ == '__main__':
             if not None == words:
                 hp_metric_dic['annotations'].append({u'image_id': i, u'caption': words})
             if not None == seq_sum:
-                sentences_likelihood.append(seq_sum)
+                sentences_likelihood.append((i,seq_sum))
 
             if args.debug and i == 10:
                 break
@@ -161,12 +164,15 @@ if __name__ == '__main__':
                 transforms.ToTensor(),
                 data_normalization
                 ])),
-            batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
+            batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
         print('size of test_loader: {}'.format(len(test_loader)))
 
         gt_metric_dic = {'annotations': list()}
         hp_metric_dic = {'annotations': list()}
-        for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
+        enumerator = enumerate(test_loader)
+        for i, (image, caps, caplens, allcaps) in tqdm(enumerator):
+            [next(enumerator, None) for _ in range(4)]
+
             for ci in range(allcaps.shape[1]):
                 gt = [rev_word_map[ind.item()] for ind in allcaps[0][ci]][1:caplens[0][ci].item() - 1]
                 gt_metric_dic['annotations'].append({u'image_id': i, u'caption': gt})
@@ -180,7 +186,7 @@ if __name__ == '__main__':
                 hp_metric_dic['annotations'].append({u'image_id': i, u'caption': words})
 
             if not None == seq_sum:
-                sentences_likelihood.append(seq_sum)
+                sentences_likelihood.append((i, seq_sum))
 
     if args.data == 'perturbed_salt':
         data_path = '/yoav_stg/gshalev/image_captioning/output_folder'
@@ -196,17 +202,18 @@ if __name__ == '__main__':
 
         test_loader = torch.utils.data.DataLoader(
             CaptionDataset(coco_data, data_name, 'TEST', transform=transform),
-            batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
+            batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
 
         gt_metric_dic = {'annotations': list()}
         hp_metric_dic = {'annotations': list()}
-        for i, (image, caps, caplens, allcaps) in tqdm(enumerate(test_loader)):
+
+        enumerator = enumerate(test_loader)
+        for i, (image, caps, caplens, allcaps) in tqdm(enumerator):
+            [next(enumerator, None) for _ in range(4)]
             for ci in range(allcaps.shape[1]):
                 gt = [rev_word_map[ind.item()] for ind in allcaps[0][ci]][1:caplens[0][ci].item() - 1]
                 gt_metric_dic['annotations'].append({u'image_id': i, u'caption': gt})
 
-            if i % 100 == 0:
-                print('process : {}/{}'.format(i, len(test_loader)))
             image = image.to(device)
             _, _, _, seq_sum, words = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
                                                                 args.beam_size)
@@ -214,7 +221,7 @@ if __name__ == '__main__':
                 hp_metric_dic['annotations'].append({u'image_id': i, u'caption': words})
 
             if not None == seq_sum:
-                sentences_likelihood.append(seq_sum)
+                sentences_likelihood.append((i,seq_sum))
 
     if args.data == 'custom':
         print('using cuda: {}', format(device))
@@ -285,7 +292,7 @@ if __name__ == '__main__':
                 sentences_likelihood.append(seq_sum)
 
     # section: save dic
-    dic_name = 'pos_dic_{}_beam_{}'.format(args.data, args.beam_size)
+    dic_name = 'NEW_pos_dic_{}_beam_{}'.format(args.data, args.beam_size)
     print('dic name: {}'.format(dic_name))
 
     save_data_path = os.path.join(save_dir, dic_name)
@@ -298,12 +305,12 @@ if __name__ == '__main__':
 
     # section: seva metrics
     if args.data in metrics_data_type_to_save:
-        metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics')
+        metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics') if not args.run_local else os.path.join(save_dir,'metrics')
         if not os.path.exists(metrics_save_dir):
             os.mkdir(metrics_save_dir)
             print('created dir: {}'.format(metrics_save_dir))
 
-        metrics_result_file_name = 'metrics_results_{}_beam_{}'.format(args.data, args.beam_size)
+        metrics_result_file_name = 'NEW_metrics_results_{}_beam_{}'.format(args.data, args.beam_size)
         torch.save({'gt': gt_metric_dic, 'hyp': hp_metric_dic},
                    os.path.join(metrics_save_dir, metrics_result_file_name))
         print('Saved metrics results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
