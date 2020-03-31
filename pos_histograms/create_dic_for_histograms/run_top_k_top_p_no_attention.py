@@ -300,12 +300,12 @@ if __name__ == '__main__':
                 'sentence_likelihood': sentences_likelihood},
                save_data_path)
 
-    metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics')
+    metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics_roc_and_more')
     if not os.path.exists(metrics_save_dir):
         os.mkdir(metrics_save_dir)
         print('created dir: {}'.format(metrics_save_dir))
 
     metrics_result_file_name = 'metrics_results_{}_{}_{}'.format(args.data, 'top_k' if args.top_k > 0 else 'top_p', args.top_k if args.top_k > 0 else args.top_p)
     torch.save({'gt': gt_metric_dic, 'hyp': hp_metric_dic}, os.path.join(metrics_save_dir, metrics_result_file_name))
-    print('Saved metrics results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
+    print('Saved metrics_roc_and_more results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
 # run_top_k_top_p_no_attention.py

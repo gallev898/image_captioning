@@ -1,28 +1,23 @@
 import sys
 
-# from dataloader.datasets import CaptionDataset
-# from models.fixed_models_no_attention import *
-# from training. import *
-from dataset_loader.datasets import CaptionDataset
-from standart_training.models.fixed_models_no_attention import *
-from standart_training.train_show_and_tell_pack_utils import *
 
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 
+from standart_training.train_show_and_tell_pack_utils import *
 from utils import *
 import time
 import torch.optim
 import torch.utils.data
+import numpy as np
 
 import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 
 from torch import nn
-# from pack_utils import *
-# from standart_training.fixed_models_no_attention import Encoder, DecoderWithoutAttention, get_embeddings
-# from dataset_loader.datasets2 import *
+from standart_training.fixed_models_no_attention import Encoder, DecoderWithoutAttention
+from dataset_loader.datasets2 import *
 from torch.nn.utils.rnn import pack_padded_sequence
 from nltk.translate.bleu_score import corpus_bleu
 
@@ -60,6 +55,23 @@ best_bleu4 = 0.  # BLEU-4 score right now
 print_freq = 100  # print training/validation stats every __ batches
 
 
+def get_embeddings(embedding_size, vocab_size, args):
+    model= 'NEW_BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar'
+    server_path = '/yoav_stg/gshalev/image_captioning/train_show_and_tell_dotproduct/{}'.format(model)
+    local_path = '/Users/gallevshalev/Desktop/trained_models/train_show_and_tell_dotproduct/{}'.format(model)
+    dotproduct = torch.load(local_path if args.run_local else server_path)
+    representation = dotproduct['representations'].t()
+    word2vec_dictionary = dict()
+    for cls_idx in range(vocab_size):
+        v = np.random.randint(low=-100, high=100, size=embedding_size) * torch.norm(representation[cls_idx]).item()
+        v = v / np.linalg.norm(v)
+        word2vec_dictionary[cls_idx] = torch.from_numpy(v).float()
+
+    w2v_matrix = torch.stack(list(word2vec_dictionary.values()), dim=1)
+    return w2v_matrix
+
+
+
 def main():
 
     # section: settings
@@ -86,7 +98,7 @@ def main():
     rev_word_map = {v: k for k, v in word_map.items()}
 
     # section: representation
-    representations = get_embeddings(decoder_dim, len(word_map)).to(device)
+    representations = get_embeddings(decoder_dim, len(word_map), args).to(device)
 
     # section: cosine
     if not args.fixed:
@@ -96,11 +108,11 @@ def main():
     if args.checkpoint is None:
         print('run a new model (No args.checkpoint)')
         decoder = DecoderWithoutAttention(attention_dim=attention_dim,
-                                          embed_dim=emb_dim,
-                                          decoder_dim=decoder_dim,
-                                          vocab_size=len(word_map),
-                                          device=device,
-                                          dropout=dropout)
+                                       embed_dim=emb_dim,
+                                       decoder_dim=decoder_dim,
+                                       vocab_size=len(word_map),
+                                       device=device,
+                                       dropout=dropout)
 
         decoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, decoder.parameters()),
                                              lr=decoder_lr)
@@ -204,7 +216,9 @@ def main():
 
         print('9999999999999- recent blue {}'.format(recent_bleu4))
         print('--------------3333333333-----------Start val without teacher forcing----------epoch-{}'.format(epoch))
-        caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map, representations)
+        with torch.no_grad():
+
+            caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map, representations)
         print('!@#!@!#!#@!#@!#@ DONE WITH TRAIN VAL AND VAL WITHOUT TEACHER FORCING FOR EPOCH :{}'.format(epoch))
 
         # section: save model if there was an improvement
@@ -300,7 +314,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
 
 def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_map, representations, beam_size=3):
-
+    decoder.eval()
     for i, (imgs, caps, caplens, allcaps) in enumerate(val_loader):
         if i > 100 or (args.debug and i > 2):
             break
@@ -536,4 +550,4 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map, representati
 if __name__ == '__main__':
     main()
 
-# train_fix_show_and_tell.py
+# train_fix_show_and_tell_with_embeddings_norm_manipulation.py

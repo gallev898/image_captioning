@@ -235,7 +235,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
     decoder.train()  # train mode (dropout and batchnorm is used)
     encoder.train()
 
-    # section: metrics
+    # section: metrics_roc_and_more
     batch_time = AverageMeter()  # forward prop. + back prop. time
     data_time = AverageMeter()  # data loading time
     losses = AverageMeter()  # loss (per word decoded)
@@ -366,7 +366,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         if encoder_optimizer is not None:
             encoder_optimizer.step()
 
-        # section: Keep track of metrics
+        # section: Keep track of metrics_roc_and_more
         top5 = accuracy(scores, targets, 5)
 
         losses.update(loss.item(), sum(decode_lengths))
@@ -590,7 +590,7 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map):
             # a pixel's weights across all timesteps
             loss += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
-            # Keep track of metrics
+            # Keep track of metrics_roc_and_more
             losses.update(loss.item(), sum(decode_lengths))
             top5 = accuracy(scores, targets, 5)
             top5accs.update(top5, sum(decode_lengths))

@@ -6,7 +6,7 @@ sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
 from standart_training.fixed_models_no_attention import DecoderWithoutAttention, Encoder
 from dataset_loader.datasets import CaptionDataset
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import os
 # from decoding_strategist_visualizations.decoding_strategist_utils import *
 from decoding_strategist_visualizations.beam_search.beam_search_pack_utils_show_and_tell import get_args, \
@@ -46,7 +46,8 @@ def run(encoder, decoder, word_map, rev_word_map, image_path, image_name, repres
                                                                            word_map, decoder, device, representations)
 
     print(top_seq_total_scors)
-    print(np.exp(top_seq_total_scors))
+    if not top_seq_total_scors == None:
+        print(np.exp(top_seq_total_scors))
     visualize_att(image_path[0], seq, rev_word_map)
 
     f = open(os.path.join('.', 'seq_sum.txt'), 'a+')
@@ -105,6 +106,16 @@ if __name__ == '__main__':
     # section: Load model
     encoderA, decoderA, representationsA = get_models(modelA_path, device)
     encoderB, decoderB, representationsB = get_models(modelB_path, device)
+
+    # # subsec: transpose
+    # representationsA = representationsA.t()
+    # representationsB = representationsB.t()
+    # for i in range(representationsA.shape[0]):
+    #     representationsB[i] = representationsB[i] * torch.norm(representationsA[i]).item()
+    #
+    # # subsec: transpose
+    # representationsA = representationsA.t()
+    # representationsB = representationsB.t()
 
     assert representationsA.requires_grad == True  # notice: train_show_and_tell_dotproduct
     assert representationsB.requires_grad == False  # notice: train_show_and_tell_fixed_dotproduct

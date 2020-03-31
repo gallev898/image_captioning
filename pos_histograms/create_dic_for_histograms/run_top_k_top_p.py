@@ -5,7 +5,8 @@ import sys
 
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
-from dataset_loader.Pertubation import ImgAugTransformJpegCompression, ImgAugTransformSaltAndPepper
+from dataset_loader.Pertubation import ImgAugTransformJpegCompression, ImgAugTransformSaltAndPepper, \
+    ImgAugTransformSnow, ImgAugTransformCartoon
 
 from decoding_strategist_visualizations.top_k_top_p_captions.top_k_p_pack_utils import caption_image
 from utils import *
@@ -214,6 +215,7 @@ if __name__ == '__main__':
                 gt_metric_dic['annotations'].append({u'image_id': i, u'caption': gt})
 
             image = image.to(device)
+
             _, _, _, sen_likelihood, words = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map)
 
             if not None == words:
@@ -287,7 +289,97 @@ if __name__ == '__main__':
             if not None == sen_likelihood:
                 sentences_likelihood.append(sen_likelihood)
 
-    dic_name = 'pos_dic_{}_{}_{}'.format(args.data, 'top_k' if args.top_k > 0 else 'top_p',
+    if args.data == 'snow':
+
+        p = '/yoav_stg/gshalev/image_captioning/output_folder'
+        coco_data = '../../output_folder' if args.run_local else p
+
+        gt_metric_dic = {'annotations': list()}
+        hp_metric_dic = {'annotations': list()}
+
+        transforms_ = [
+            transforms.ToPILImage(),
+            ImgAugTransformSnow(),
+            lambda x: PIL.Image.fromarray(x),
+            transforms.ToTensor(),
+            data_normalization
+        ]
+        # section: dataloader
+        test_loader = torch.utils.data.DataLoader(
+            CaptionDataset(coco_data, data_name, 'TEST', transform=transforms.Compose(transforms_)),
+            batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
+        print('len test_loader: {}'.format(len(test_loader)))
+
+        # section: start inference
+        enumerator = enumerate(test_loader)
+        for bi, (image, caps, caplens, allcaps) in tqdm(enumerator):
+
+            [next(enumerator, None) for _ in range(4)]
+
+            # subsec: collect all current img caps
+            for ci in range(allcaps.shape[1]):
+                gt = [rev_word_map[ind.item()] for ind in allcaps[0][ci]][1:caplens[0][ci].item() - 1]
+                gt_metric_dic['annotations'].append({u'image_id': bi, u'caption': gt})
+
+            # subsec: move to device
+            image = image.to(device)
+
+            # subsec: run top_k
+
+            _, _, _, sen_likelihood, words = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map)
+
+            if not None == words:
+                hp_metric_dic['annotations'].append({u'image_id': bi, u'caption': words})
+            if not None == sen_likelihood:
+                sentences_likelihood.append((bi, sen_likelihood))
+
+
+    if args.data == 'aug_cartoon':
+
+        p = '/yoav_stg/gshalev/image_captioning/output_folder'
+        coco_data = '../../output_folder' if args.run_local else p
+
+        gt_metric_dic = {'annotations': list()}
+        hp_metric_dic = {'annotations': list()}
+
+        transforms_ = [
+            transforms.ToPILImage(),
+            ImgAugTransformCartoon(),
+            lambda x: PIL.Image.fromarray(x),
+            transforms.ToTensor(),
+            data_normalization
+        ]
+        # section: dataloader
+        test_loader = torch.utils.data.DataLoader(
+            CaptionDataset(coco_data, data_name, 'TEST', transform=transforms.Compose(transforms_)),
+            batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
+        print('len test_loader: {}'.format(len(test_loader)))
+
+        # section: start inference
+        enumerator = enumerate(test_loader)
+        for bi, (image, caps, caplens, allcaps) in tqdm(enumerator):
+
+            [next(enumerator, None) for _ in range(4)]
+
+            # subsec: collect all current img caps
+            for ci in range(allcaps.shape[1]):
+                gt = [rev_word_map[ind.item()] for ind in allcaps[0][ci]][1:caplens[0][ci].item() - 1]
+                gt_metric_dic['annotations'].append({u'image_id': bi, u'caption': gt})
+
+            # subsec: move to device
+            image = image.to(device)
+
+            # subsec: run top_k
+
+            _, _, _, sen_likelihood, words = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map)
+
+            if not None == words:
+                hp_metric_dic['annotations'].append({u'image_id': bi, u'caption': words})
+            if not None == sen_likelihood:
+                sentences_likelihood.append((bi, sen_likelihood))
+
+
+    dic_name = 'NEW_pos_dic_{}_{}_{}'.format(args.data, 'top_k' if args.top_k > 0 else 'top_p',
                                          args.top_k if args.top_k > 0 else args.top_p)
     print('dic name: {}'.format(dic_name))
 
@@ -299,12 +391,12 @@ if __name__ == '__main__':
                 'sentence_likelihood': sentences_likelihood},
                save_data_path)
 
-    metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics')
+    metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics_roc_and_more')
     if not os.path.exists(metrics_save_dir):
         os.mkdir(metrics_save_dir)
         print('created dir: {}'.format(metrics_save_dir))
 
-    metrics_result_file_name = 'metrics_results_{}_{}_{}'.format(args.data, 'top_k' if args.top_k > 0 else 'top_p', args.top_k if args.top_k > 0 else args.top_p)
+    metrics_result_file_name = 'NEW_metrics_results_{}_{}_{}'.format(args.data, 'top_k' if args.top_k > 0 else 'top_p', args.top_k if args.top_k > 0 else args.top_p)
     torch.save({'gt': gt_metric_dic, 'hyp': hp_metric_dic}, os.path.join(metrics_save_dir, metrics_result_file_name))
-    print('Saved metrics results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
+    print('Saved metrics_roc_and_more results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
 # run_top_k_top_p.py

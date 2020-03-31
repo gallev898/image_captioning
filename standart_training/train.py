@@ -306,7 +306,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         if encoder_optimizer is not None:
             encoder_optimizer.step()
 
-        # Keep track of metrics
+        # Keep track of metrics_roc_and_more
         top5 = accuracy(scores, targets, 5)
 
         losses.update(loss.item(), sum(decode_lengths))
@@ -529,7 +529,7 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map):
             # a pixel's weights across all timesteps
             loss += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
-            # Keep track of metrics
+            # Keep track of metrics_roc_and_more
             losses.update(loss.item(), sum(decode_lengths))
             top5 = accuracy(scores, targets, 5)
             top5accs.update(top5, sum(decode_lengths))

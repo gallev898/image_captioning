@@ -16,13 +16,6 @@ def encode(encoder, image, beam_size, word_map, device):
     # Encode - return the output of resnet as 2048 channels
     encoder_out = encoder(image)  # (1, enc_image_size, enc_image_size, encoder_dim)
 
-    # enc_image_size = encoder_out.size(1)
-    # encoder_dim = encoder_out.size(1)
-
-    # Flatten encoding
-    # encoder_out = encoder_out.view(1, -1, encoder_dim)  # (1, num_pixels, encoder_dim)
-    # num_pixels = encoder_out.size(1)  # num of pixels in each
-
     # We'll treat the problem as having a batch size of k
     encoder_out = encoder_out.expand(5,512)  # (k, num_pixels, encoder_dim)
 

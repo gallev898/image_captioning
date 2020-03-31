@@ -296,9 +296,9 @@ if __name__ == '__main__':
                 'sentence_likelihood': sentences_likelihood},
                save_data_path)
 
-    # section: seva metrics
+    # section: seva metrics_roc_and_more
     if args.data in metrics_data_type_to_save:
-        metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics')
+        metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics_roc_and_more')
         if not os.path.exists(metrics_save_dir):
             os.mkdir(metrics_save_dir)
             print('created dir: {}'.format(metrics_save_dir))
@@ -306,6 +306,6 @@ if __name__ == '__main__':
         metrics_result_file_name = 'metrics_results_{}_beam_{}'.format(args.data, args.beam_size)
         torch.save({'gt': gt_metric_dic, 'hyp': hp_metric_dic},
                    os.path.join(metrics_save_dir, metrics_result_file_name))
-        print('Saved metrics results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
+        print('Saved metrics_roc_and_more results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
 
 # run_beam_search_no_attention.py

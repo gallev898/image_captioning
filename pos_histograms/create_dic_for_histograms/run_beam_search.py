@@ -1,6 +1,5 @@
 import sys
 
-
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 
@@ -23,9 +22,9 @@ from tqdm import *
 from dataset_loader.datasets import CaptionDataset
 from dataset_loader.dataloader import load
 
-
 args = get_args()
 device = torch.device("cuda:{}".format(args.cuda) if torch.cuda.is_available() else "cpu")
+coco_data_path = '/Users/gallevshalev/PycharmProjects/image_captioning/output_folder' if args.run_local else '/yoav_stg/gshalev/image_captioning/output_folder'
 
 
 def caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, beam_size):
@@ -103,6 +102,7 @@ def caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map, b
 
 
 if __name__ == '__main__':
+
     print('Strating beam search : {}'.format(args.beam_size))
     model_path, save_dir = get_model_path_and_save_dir(args, 'pos_dic')
 
@@ -115,7 +115,7 @@ if __name__ == '__main__':
 
     print(len(word_map))
     print('create pos dic for {} data'.format(args.data))
-    metrics_data_type_to_save = ['test', 'perturbed_jpeg', 'perturbed_salt']
+    metrics_data_type_to_save = ['test', 'perturbed_jpeg', 'perturbed_salt', 'snow', 'aug_cartoon']
 
     # section: build dic
     if args.data == 'test':
@@ -146,7 +146,7 @@ if __name__ == '__main__':
             if not None == words:
                 hp_metric_dic['annotations'].append({u'image_id': i, u'caption': words})
             if not None == seq_sum:
-                sentences_likelihood.append((i,seq_sum))
+                sentences_likelihood.append((i, seq_sum))
 
             if args.debug and i == 10:
                 break
@@ -163,7 +163,7 @@ if __name__ == '__main__':
                 lambda x: PIL.Image.fromarray(x),
                 transforms.ToTensor(),
                 data_normalization
-                ])),
+            ])),
             batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
         print('size of test_loader: {}'.format(len(test_loader)))
 
@@ -198,7 +198,7 @@ if __name__ == '__main__':
             lambda x: PIL.Image.fromarray(x),
             transforms.ToTensor(),
             data_normalization
-            ])
+        ])
 
         test_loader = torch.utils.data.DataLoader(
             CaptionDataset(coco_data, data_name, 'TEST', transform=transform),
@@ -221,7 +221,7 @@ if __name__ == '__main__':
                 hp_metric_dic['annotations'].append({u'image_id': i, u'caption': words})
 
             if not None == seq_sum:
-                sentences_likelihood.append((i,seq_sum))
+                sentences_likelihood.append((i, seq_sum))
 
     if args.data == 'custom':
         print('using cuda: {}', format(device))
@@ -291,6 +291,84 @@ if __name__ == '__main__':
             if not None == seq_sum:
                 sentences_likelihood.append(seq_sum)
 
+    if args.data == 'snow':
+        gt_metric_dic = {'annotations': list()}
+        hp_metric_dic = {'annotations': list()}
+        transforms_ = [
+            transforms.ToPILImage(),
+            ImgAugTransformSnow(),
+            lambda x: PIL.Image.fromarray(x),
+            transforms.ToTensor(),
+            data_normalization
+        ]
+        # section: dataloader
+        test_loader = torch.utils.data.DataLoader(
+            CaptionDataset(coco_data_path, data_name, 'TEST', transform=transforms.Compose(transforms_)),
+            batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
+        print('len test_loader: {}'.format(len(test_loader)))
+
+        # section: start inference
+        enumerator = enumerate(test_loader)
+        for bi, (image, caps, caplens, allcaps) in tqdm(enumerator):
+
+            [next(enumerator, None) for _ in range(4)]
+
+            # subsec: collect all current img caps
+            for ci in range(allcaps.shape[1]):
+                gt = [rev_word_map[ind.item()] for ind in allcaps[0][ci]][1:caplens[0][ci].item() - 1]
+                gt_metric_dic['annotations'].append({u'image_id': bi, u'caption': gt})
+
+            # subsec: move to device
+            image = image.to(device)
+
+            # subsec: run beam search
+
+            _, _, _, seq_sum, words = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+                                                                args.beam_size)
+            if not None == words:
+                hp_metric_dic['annotations'].append({u'image_id': bi, u'caption': words})
+            if not None == seq_sum:
+                sentences_likelihood.append((bi, seq_sum))
+
+    if args.data == 'aug_cartoon':
+        gt_metric_dic = {'annotations': list()}
+        hp_metric_dic = {'annotations': list()}
+        transforms_ = [
+            transforms.ToPILImage(),
+            ImgAugTransformCartoon(),
+            lambda x: PIL.Image.fromarray(x),
+            transforms.ToTensor(),
+            data_normalization
+        ]
+        # section: dataloader
+        test_loader = torch.utils.data.DataLoader(
+            CaptionDataset(coco_data_path, data_name, 'TEST', transform=transforms.Compose(transforms_)),
+            batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
+        print('len test_loader: {}'.format(len(test_loader)))
+
+        # section: start inference
+        enumerator = enumerate(test_loader)
+        for bi, (image, caps, caplens, allcaps) in tqdm(enumerator):
+
+            [next(enumerator, None) for _ in range(4)]
+
+            # subsec: collect all current img caps
+            for ci in range(allcaps.shape[1]):
+                gt = [rev_word_map[ind.item()] for ind in allcaps[0][ci]][1:caplens[0][ci].item() - 1]
+                gt_metric_dic['annotations'].append({u'image_id': bi, u'caption': gt})
+
+            # subsec: move to device
+            image = image.to(device)
+
+            # subsec: run beam search
+
+            _, _, _, seq_sum, words = caption_image_beam_search(encoder, decoder, image, word_map, rev_word_map,
+                                                                args.beam_size)
+            if not None == words:
+                hp_metric_dic['annotations'].append({u'image_id': bi, u'caption': words})
+            if not None == seq_sum:
+                sentences_likelihood.append((bi, seq_sum))
+
     # section: save dic
     dic_name = 'NEW_pos_dic_{}_beam_{}'.format(args.data, args.beam_size)
     print('dic name: {}'.format(dic_name))
@@ -300,12 +378,14 @@ if __name__ == '__main__':
 
     torch.save({'pos': pos_dic_obj,
                 'noun_phrase_sum_of_log_prop': noun_phrase_sum_of_log_prop,
-                'sentence_likelihood': sentences_likelihood},
+                'generated_sentences_likelihood': sentences_likelihood},
                save_data_path)
 
-    # section: seva metrics
+    # section: seva metrics_roc_and_more
     if args.data in metrics_data_type_to_save:
-        metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics') if not args.run_local else os.path.join(save_dir,'metrics')
+        metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model,
+                                                                             'metrics_roc_and_more') if not args.run_local else os.path.join(
+            save_dir, 'metrics_roc_and_more')
         if not os.path.exists(metrics_save_dir):
             os.mkdir(metrics_save_dir)
             print('created dir: {}'.format(metrics_save_dir))
@@ -313,6 +393,6 @@ if __name__ == '__main__':
         metrics_result_file_name = 'NEW_metrics_results_{}_beam_{}'.format(args.data, args.beam_size)
         torch.save({'gt': gt_metric_dic, 'hyp': hp_metric_dic},
                    os.path.join(metrics_save_dir, metrics_result_file_name))
-        print('Saved metrics results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
+        print('Saved metrics_roc_and_more results in {}'.format(os.path.join(metrics_save_dir, metrics_result_file_name)))
 
 # run_beam_search.py

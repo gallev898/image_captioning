@@ -197,7 +197,9 @@ def main():
 
         print('9999999999999- recent blue {}'.format(recent_bleu4))
         print('--------------3333333333-----------Start val without teacher forcing----------epoch-{}'.format(epoch))
-        caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map, representations)
+        with torch.no_grad():
+
+            caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map, representations)
         print('!@#!@!#!#@!#@!#@ DONE WITH TRAIN VAL AND VAL WITHOUT TEACHER FORCING FOR EPOCH :{}'.format(epoch))
 
         # section: save model if there was an improvement
@@ -219,7 +221,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
     decoder.train()  # train mode (dropout and batchnorm is used)
     encoder.train()
 
-    # section: metrics
+    # section: metrics_roc_and_more
     batch_time = AverageMeter()  # forward prop. + back prop. time
     data_time = AverageMeter()  # data loading time
     losses = AverageMeter()  # loss (per word decoded)
@@ -233,7 +235,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         if (args.run_local or args.debug) and i > 2:
             break
 
-        # section: metrics
+        # section: metrics_roc_and_more
         data_time.update(time.time() - start)
 
         # section: move to device
@@ -269,7 +271,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         if encoder_optimizer is not None:
             encoder_optimizer.step()
 
-        # section: Keep track of metrics
+        # section: Keep track of metrics_roc_and_more
         top5 = accuracy(scores, targets, 5)
         losses.update(loss.item(), sum(decode_lengths))
         top5accs.update(top5, sum(decode_lengths))
@@ -293,7 +295,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
 
 def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_map, representations, beam_size=3):
-
+    decoder.eval()
     for i, (imgs, caps, caplens, allcaps) in enumerate(val_loader):
         if i > 100 or (args.debug and i > 2):
             break
@@ -456,7 +458,7 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map, representati
             # a pixel's weights across all timesteps
             # loss += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
-            # section: Keep track of metrics
+            # section: Keep track of metrics_roc_and_more
             losses.update(loss.item(), sum(decode_lengths))
             top5 = accuracy(scores, targets, 5)
             top5accs.update(top5, sum(decode_lengths))

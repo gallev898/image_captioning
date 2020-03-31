@@ -4,6 +4,8 @@ from utils import *
 
 data_folder = '/yoav_stg/gshalev/image_captioning/output_folder'  # folder with data files saved by create_input_files.py
 # data_folder = 'output_folder'  # folder with data files saved by create_input_files.py
+data_name = 'coco_5_cap_per_img_5_min_word_freq'
+data_normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
 train_loader = torch.utils.data.DataLoader(
     CaptionDataset(data_folder, data_name, 'TRAIN', transform=transforms.Compose([data_normalization])),

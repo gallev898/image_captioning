@@ -83,26 +83,15 @@ def clip_gradient(optimizer, grad_clip):
 
 
 def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer, decoder_optimizer,
-                    bleu4, is_best, representations=None, runname=None):
-    """
-    Saves model checkpoint.
+                    bleu4, is_best, representations=None, learneble_S =None, runname=None):
 
-    :param data_name: base name of processed dataset
-    :param epoch: epoch number
-    :param epochs_since_improvement: number of epochs since last improvement in BLEU-4 score
-    :param encoder: encoder model
-    :param decoder: decoder model
-    :param encoder_optimizer: optimizer to update encoder's weights, if fine-tuning
-    :param decoder_optimizer: optimizer to update decoder's weights
-    :param bleu4: validation BLEU-4 score for this epoch
-    :param is_best: is this checkpoint the best so far?
-    """
     state = {'epoch': epoch,
              'epochs_since_improvement': epochs_since_improvement,
              'bleu-4': bleu4,
              'representations': representations,
              'encoder': encoder,
              'decoder': decoder,
+             'learneble_S': learneble_S,
              'encoder_optimizer': encoder_optimizer,
              'decoder_optimizer': decoder_optimizer}
     filename = 'checkpoint_' + data_name + '.pth.tar'
@@ -205,9 +194,9 @@ def get_args():
 
     parser.add_argument('--cuda', type=int, default=0)
     parser.add_argument('--debug', default=False, action='store_true')
-    parser.add_argument('--learning_rate', default=-1, type=float)
+    parser.add_argument('--lr', default=-1, type=float)
 
     parser.add_argument('--run_local', default=False, action='store_true')
     args = parser.parse_args()
     return args
-# pack_utils.py
+# train_show_and_tell_pack_utils.py
