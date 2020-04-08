@@ -5,10 +5,10 @@ sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 from dataset_loader.dataloader import load
 from dataset_loader.Pertubation import ImgAugTransformJpegCompression, ImgAugTransformSaltAndPepper, \
-    ImgAugTransformCartoon, ImgAugTransformSnow, ImgAugTransformGaussianNoise
+    ImgAugTransformCartoon, ImgAugTransformSnow
 
 from dataset_loader.datasets import CaptionDataset
-from standart_training.models.fixed_models_no_attention import DecoderWithoutAttention, Encoder
+from standart_training.V_fixed_models_no_attention import DecoderWithoutAttention, Encoder
 
 from tqdm import *
 import json
@@ -320,11 +320,6 @@ def caption_image_beam_search(encoder_, decoder_, image_, word_map_, rev_word_ma
 if __name__ == '__main__':
 
 
-
-    if args.cosine and 'cosine' not in args.model:
-        raise Exception('cosine flag is on but model is dotproduct')
-    if not args.cosine and 'cosine' in args.model:
-        raise Exception('cosine flag is off but cosine model given')
 
     print('Strating beam search : {}'.format(args.beam_size))
 

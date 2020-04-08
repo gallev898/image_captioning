@@ -4,7 +4,7 @@ import sys
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 
-from standart_training.fixed_models_no_attention import DecoderWithoutAttention, Encoder
+from not_in_use.fixed_models_no_attention import DecoderWithoutAttention, Encoder
 from dataset_loader.datasets import CaptionDataset
 import matplotlib.pyplot as plt
 import os

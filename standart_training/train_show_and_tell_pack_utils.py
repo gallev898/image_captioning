@@ -34,13 +34,7 @@ def init_embedding(embeddings):
 
 
 def load_embeddings(emb_file, word_map):
-    """
-    Creates an embedding tensor for the specified word map, for loading into the model.
 
-    :param emb_file: file containing embeddings (stored in GloVe format)
-    :param word_map: word map
-    :return: embeddings in the same order as the words in the word map, dimension of embeddings
-    """
 
     # Find embedding dimension
     with open(emb_file, 'r') as f:

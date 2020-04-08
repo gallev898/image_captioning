@@ -3,6 +3,10 @@ import sys
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 
+from dataset_loader.datasets2 import CaptionDataset
+from standart_training.V_fixed_models_no_attention import *
+from standart_training.train_show_and_tell_pack_utils import *
+
 from utils import *
 import time
 import torch.optim
@@ -13,9 +17,6 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 
 from torch import nn
-from standart_training.pack_utils import *
-from standart_training.fixed_models_no_attention import Encoder, DecoderWithoutAttention, get_embeddings
-from dataset_loader.datasets2 import *
 from torch.nn.utils.rnn import pack_padded_sequence
 from nltk.translate.bleu_score import corpus_bleu
 
@@ -28,6 +29,7 @@ print('ARGS: {}'.format(args))
 if not args.run_local:
     # wandb login a8c4526db3e8aa11d7b2674d7c257c58313b45ca
     import wandb
+
     wandb.init(project="image_captioning", name=args.runname, dir='/yoav_stg/gshalev/wandb')
 
 # section: Model parameters
@@ -46,27 +48,36 @@ start_epoch = 0
 epochs = 120  # number of epochs to train for (if early stopping is not triggered)
 epochs_since_improvement = 0  # keeps track of number of epochs since there's been an improvement in validation BLEU
 encoder_lr = 1e-4  # learning rate for encoder if fine-tuning
-decoder_lr = 4e-4  # learning rate for decoder
+decoder_lr = args.lr if args.lr > -1 else 4e-4  # learning rate for decoder
 grad_clip = 5.  # clip gradients at an absolute value of
 alpha_c = 1.  # regularization parameter for 'doubly stochastic attention', as in the paper
 best_bleu4 = 0.  # BLEU-4 score right now
 print_freq = 100  # print training/validation stats every __ batches
+server_data_folder = '/Users/gallevshalev/PycharmProjects/image_captioning/output_folder/'
+data_name = 'coco_5_cap_per_img_5_min_word_freq'
+
+
+def get_embeddings(embedding_size, vocab_size):
+    word2vec_dictionary = dict()
+    for cls_idx in range(vocab_size):
+        v = np.random.randint(low=-100, high=100, size=embedding_size)
+        v = v / np.linalg.norm(v)
+        word2vec_dictionary[cls_idx] = torch.from_numpy(v).float()
+
+    w2v_matrix = torch.stack(list(word2vec_dictionary.values()), dim=1)
+    return w2v_matrix
 
 
 def main():
 
-    # section: settings
-    global best_bleu4, epochs_since_improvement, start_epoch, data_name, word_map
-
-    # section: fine tune
-    if args.fine_tune_encoder and args.fine_tune_epochs == -1:
-        raise Exception('if "fine_tune_encoder" == true you must also specify "fine_tune_epochs" != -1')
+    global epochs_since_improvement, best_bleu4
+    print('LR: {}'.format(args.lr))
 
     # section: word map
     if not args.run_local:
         data_f = '/yoav_stg/gshalev/image_captioning/output_folder'
     else:
-        data_f = data_folder
+        data_f = server_data_folder
 
     word_map_file = os.path.join(data_f, 'WORDMAP_' + data_name + '.json')
     print('word_map_file: {}'.format(word_map_file))
@@ -81,50 +92,30 @@ def main():
     # section: representation
     representations = get_embeddings(decoder_dim, len(word_map)).to(device)
 
-    # section: cosine
+    # section: not fixed
     if not args.fixed:
         representations.requires_grad = True
 
-    # section: Initialization
-    if args.checkpoint is None:
-        print('run a new model (No args.checkpoint)')
-        decoder = DecoderWithoutAttention(attention_dim=attention_dim,
-                                       embed_dim=emb_dim,
-                                       decoder_dim=decoder_dim,
-                                       vocab_size=len(word_map),
-                                       device=device,
-                                       dropout=dropout)
+    # section: decoder
+    decoder = DecoderWithoutAttention(attention_dim=attention_dim,
+                                      embed_dim=emb_dim,
+                                      decoder_dim=decoder_dim,
+                                      vocab_size=len(word_map),
+                                      device=device,
+                                      dropout=dropout)
 
-        decoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, decoder.parameters()),
-                                             lr=decoder_lr)
-        if not args.fixed:
-            decoder_optimizer.add_param_group({'params': representations})
+    decoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, decoder.parameters()),
+                                         lr=decoder_lr)
+    # section: not fixed
+    if not args.fixed:
+        decoder_optimizer.add_param_group({'params': representations})
 
-        encoder = Encoder()
-        #notice: fine to encoder
-        encoder.fine_tune(True if args.fine_tune_encoder and args.fine_tune_epochs == 0 else False)
-        encoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, encoder.parameters()),
-                                             lr=encoder_lr) if args.fine_tune_encoder and args.fine_tune_epochs == 0 else None
-
-    # section: load checkpoint
-    else:
-        print('run a model loaded from args.checkpoint')
-        checkpoint = torch.load(args.checkpoint)
-        start_epoch = checkpoint['epoch'] + 1
-        epochs_since_improvement = 0
-        best_bleu4 = checkpoint['bleu-4']
-        decoder = checkpoint['decoder']
-        decoder_optimizer = checkpoint['decoder_optimizer']
-        encoder = checkpoint['encoder']
-        encoder_optimizer = checkpoint['encoder_optimizer']
-
-        if args.fine_tune_encoder and encoder_optimizer is None:
-            print('----------loading model without encoder optimizer')
-            encoder.fine_tune(args.fine_tune_encoder)
-            encoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, encoder.parameters()),
-                                                 lr=encoder_lr)
-        elif args.fine_tune_encoder and encoder_optimizer is not None:
-            raise Exception('you are loading a model with encoder optimizer')
+    # section: encoder
+    encoder = Encoder()
+    # notice: fine to encoder
+    encoder.fine_tune(True if args.fine_tune_encoder and args.fine_tune_epochs == 0 else False)
+    encoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, encoder.parameters()),
+                                         lr=encoder_lr) if args.fine_tune_encoder and args.fine_tune_epochs == 0 else None
 
     # section: Move to GPU, if available
     decoder = decoder.to(device)
@@ -171,12 +162,6 @@ def main():
             print('!!!  ADJUST LR AFTER : epochs_since_improvement: {}'.format(epochs_since_improvement))
             adjust_learning_rate(decoder_optimizer, 0.8)
 
-            # if args.checkpoint is not None:
-            #     adjust_learning_rate(encoder_optimizer, 0.8)
-            # elif args.fine_tune_encoder and epoch > args.fine_tune_epochs:
-            #     print('------------------------------------epoch: {} fine tune lr encoder'.format(epoch))
-            #     adjust_learning_rate(encoder_optimizer, 0.8)
-
         # section: train
         print('--------------111111111-----------Start train----------epoch-{}'.format(epoch))
         train(train_loader=train_loader,
@@ -189,18 +174,18 @@ def main():
 
         # section: eval
         print('--------------2222222222-----------Start validation----------epoch-{}'.format(epoch))
-        recent_bleu4 = validate(val_loader=val_loader,
-                                encoder=encoder,
-                                decoder=decoder,
-                                criterion=criterion,
-                                rev_word_map=rev_word_map, representations=representations)
+        with torch.no_grad():
+            recent_bleu4 = validate(val_loader=val_loader,
+                                    encoder=encoder,
+                                    decoder=decoder,
+                                    criterion=criterion,
+                                    rev_word_map=rev_word_map, representations=representations, word_map=word_map)
 
         print('9999999999999- recent blue {}'.format(recent_bleu4))
         print('--------------3333333333-----------Start val without teacher forcing----------epoch-{}'.format(epoch))
         with torch.no_grad():
-
             caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map, representations)
-        print('!@#!@!#!#@!#@!#@ DONE WITH TRAIN VAL AND VAL WITHOUT TEACHER FORCING FOR EPOCH :{}'.format(epoch))
+            print('!@#!@!#!#@!#@!#@ DONE WITH TRAIN VAL AND VAL WITHOUT TEACHER FORCING FOR EPOCH :{}'.format(epoch))
 
         # section: save model if there was an improvement
         is_best = recent_bleu4 > best_bleu4
@@ -212,11 +197,10 @@ def main():
             epochs_since_improvement = 0
 
         save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
-                        decoder_optimizer, recent_bleu4, is_best, representations, args.runname)
+                        decoder_optimizer, recent_bleu4, is_best, representations=representations, runname=args.runname)
 
 
 def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch, representations):
-
     # section: train mode
     decoder.train()  # train mode (dropout and batchnorm is used)
     encoder.train()
@@ -295,7 +279,6 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
 
 def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_map, representations, beam_size=3):
-    decoder.eval()
     for i, (imgs, caps, caplens, allcaps) in enumerate(val_loader):
         if i > 100 or (args.debug and i > 2):
             break
@@ -304,7 +287,7 @@ def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_m
         vocab_size = len(word_map)
         imgs = imgs.to(device)
         # # Encode
-        encoder_out = encoder(imgs).repeat(k,1).to(device)  # (1, enc_image_size, enc_image_size, encoder_dim)
+        encoder_out = encoder(imgs).repeat(k, 1).to(device)  # (1, enc_image_size, enc_image_size, encoder_dim)
 
         # Tensor to store top k previous words at each step; now they're just <start>
         k_prev_words = torch.LongTensor([[word_map['<start>']]] * k).to(device)  # (k, 1)
@@ -345,7 +328,7 @@ def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_m
                 scores *= args.sphere
 
             # scores = decoder.fc(h)  # (s, vocab_size)
-            # scores = F.log_softmax(scores, dim=1)
+            scores = F.log_softmax(scores, dim=1)
             scores_copy = scores.clone()
 
             # Add
@@ -394,21 +377,20 @@ def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_m
                 break
             step += 1
 
-        if len(complete_seqs_scores) > 0 :
-            i = complete_seqs_scores.index(max (complete_seqs_scores))
+        if len(complete_seqs_scores) > 0:
+            i = complete_seqs_scores.index(max(complete_seqs_scores))
 
             seq = complete_seqs[i]
 
             words = [rev_word_map[ind] for ind in seq]
 
-            print('5    '+' '.join(words))
+            print('5    ' + ' '.join(words))
 
 
-def validate(val_loader, encoder, decoder, criterion, rev_word_map, representations):
+def validate(val_loader, encoder, decoder, criterion, rev_word_map, representations, word_map):
     # section: eval mode
     decoder.eval()
-    if encoder is not None:
-        encoder.eval()
+    encoder.eval()
 
     # section: meter
     batch_time = AverageMeter()
@@ -419,116 +401,113 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map, representati
     references = list()  # references (true captions) for calculating BLEU-4 score
     hypotheses = list()  # hypotheses (predictions)
 
-    # section: forward
-    with torch.no_grad():
-        # section: Batches
-        for i, (imgs, caps, caplens, allcaps) in enumerate(val_loader):
-            # section: break after one epoch if debugging locally
-            if (args.run_local or args.debug) and i > 2:
-                break
+    # section: Batches
+    for i, (imgs, caps, caplens, allcaps) in enumerate(val_loader):
 
-            # section: Move to device, if available
-            imgs = imgs.to(device)
-            caps = caps.to(device)
-            caplens = caplens.to(device)
+        # section: break after one epoch if debugging locally
+        if (args.run_local or args.debug) and i > 2:
+            break
 
-            # section: Forward prop.
-            if encoder is not None:
-                imgs = encoder(imgs)
+        # section: Move to device, if available
+        imgs = imgs.to(device)
+        caps = caps.to(device)
+        caplens = caplens.to(device)
 
-            scores, caps_sorted, decode_lengths, _, sort_ind = decoder(imgs, caps, caplens, args, representations)
+        # section: Forward prop.
+        imgs = encoder(imgs)
+        scores, caps_sorted, decode_lengths, _, sort_ind = decoder(imgs, caps, caplens, args, representations)
 
-            # notice: Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
-            targets = caps_sorted[:, 1:]
+        # notice: Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
+        targets = caps_sorted[:, 1:]
 
-            # notice: Remove timesteps that we didn't decode at, or are pads
-            # notice: pack_padded_sequence is an easy trick to do this
-            scores_copy = scores.clone()
-            scores = pack_padded_sequence(scores, decode_lengths, batch_first=True).data
-            targets = pack_padded_sequence(targets, decode_lengths, batch_first=True).data
+        # notice: Remove timesteps that we didn't decode at, or are pads
+        # notice: pack_padded_sequence is an easy trick to do this
+        scores_copy = scores.clone()
+        scores = pack_padded_sequence(scores, decode_lengths, batch_first=True).data
+        targets = pack_padded_sequence(targets, decode_lengths, batch_first=True).data
 
-            # section: Calculate loss
-            loss = criterion(scores, targets)
+        # section: Calculate loss
+        loss = criterion(scores, targets)
 
-            # Add doubly stochastic attention regularization
-            # We know the weights sum to 1 at a given timestep. But we also encourage
-            # the weights at a single pixel p to sum to 1 across all timesteps T
-            # This means we want the model to attend to every pixel over the course of generating
-            # the entire sequence. Therefore, we try to minimize the difference between 1 and the sum of
-            # a pixel's weights across all timesteps
-            # loss += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
+        # Add doubly stochastic attention regularization
+        # We know the weights sum to 1 at a given timestep. But we also encourage
+        # the weights at a single pixel p to sum to 1 across all timesteps T
+        # This means we want the model to attend to every pixel over the course of generating
+        # the entire sequence. Therefore, we try to minimize the difference between 1 and the sum of
+        # a pixel's weights across all timesteps
+        # loss += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
-            # section: Keep track of metrics_roc_and_more
-            losses.update(loss.item(), sum(decode_lengths))
-            top5 = accuracy(scores, targets, 5)
-            top5accs.update(top5, sum(decode_lengths))
-            batch_time.update(time.time() - start)
-            start = time.time()
+        # section: Keep track of metrics_roc_and_more
+        losses.update(loss.item(), sum(decode_lengths))
+        top5 = accuracy(scores, targets, 5)
+        top5accs.update(top5, sum(decode_lengths))
+        batch_time.update(time.time() - start)
+        start = time.time()
 
-            # section: print
-            if i % print_freq == 0:
-                print('4    Validation: [{0}/{1}]\t'
-                      'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Top-5 Accuracy {top5.val:.3f} ({top5.avg:.3f})\t'.format(i, len(val_loader),
-                                                                                batch_time=batch_time,
-                                                                                loss=losses, top5=top5accs))
+        # section: print
+        if i % print_freq == 0:
+            print('4    Validation: [{0}/{1}]\t'
+                  'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                  'Top-5 Accuracy {top5.val:.3f} ({top5.avg:.3f})\t'.format(i, len(val_loader),
+                                                                            batch_time=batch_time,
+                                                                            loss=losses, top5=top5accs))
 
-            # Store references (true captions), and hypothesis (prediction) for each image
-            # If for n images, we have n hypotheses, and references a, b, c... for each image, we need -
-            # references = [[ref1a, ref1b, ref1c], [ref2a, ref2b], ...], hypotheses = [hyp1, hyp2, ...]
-            # References
-            allcaps = allcaps[sort_ind]  # because images were sorted in the decoder
-            for j in range(allcaps.shape[0]):  # for each example
-                img_caps = allcaps[j].tolist()
-                img_captions = list(
-                    map(lambda c: [w for w in c if w not in {word_map['<start>'], word_map['<pad>']}],
-                        img_caps))  # remove <start> and pads
-                references.append(img_captions)
+        # Store references (true captions), and hypothesis (prediction) for each image
+        # If for n images, we have n hypotheses, and references a, b, c... for each image, we need -
+        # references = [[ref1a, ref1b, ref1c], [ref2a, ref2b], ...], hypotheses = [hyp1, hyp2, ...]
+        # References
+        allcaps = allcaps[sort_ind]  # because images were sorted in the decoder
+        for j in range(allcaps.shape[0]):  # for each example
+            img_caps = allcaps[j].tolist()
+            img_captions = list(
+                map(lambda c: [w for w in c if w not in {word_map['<start>'], word_map['<pad>']}],
+                    img_caps))  # remove <start> and pads
+            references.append(img_captions)
 
-            # Hypotheses
-            # get for each example the max pred at each time step (batch size, max length caption)
-            pred_values, preds_ind = torch.max(scores_copy, dim=2)
-            preds_ind = preds_ind.tolist()
-            temp_preds = list()
+        # Hypotheses
+        # get for each example the max pred at each time step (batch size, max length caption)
+        pred_values, preds_ind = torch.max(scores_copy, dim=2)
+        preds_ind = preds_ind.tolist()
+        temp_preds = list()
 
-            # section: remove pads
-            for j, p in enumerate(preds_ind):
-                temp_preds.append(preds_ind[j][:decode_lengths[j]])
-            preds_ind = temp_preds
-            hypotheses.extend(preds_ind)
+        # section: remove pads
+        for j, p in enumerate(preds_ind):
+            temp_preds.append(preds_ind[j][:decode_lengths[j]])
+        preds_ind = temp_preds
+        hypotheses.extend(preds_ind)
 
-            assert len(references) == len(hypotheses)
+        assert len(references) == len(hypotheses)
 
-            # section: print preds
-            if (i + 1) % 300 == 0:
-                print('-1   ************print captions***********')
-                num_to_print = 0
-                for h in hypotheses:
-                    if num_to_print < 100:
-                        words = []
-                        for w in h:
-                            words.append(rev_word_map[w])
-                        print('1    '+' '.join(words))
-                        num_to_print += 1
-                    else:
-                        break
+        # section: print preds
+        if (i + 1) % 300 == 0:
+            print('-1   ************print captions***********')
+            num_to_print = 0
+            for h in hypotheses:
+                if num_to_print < 100:
+                    words = []
+                    for w in h:
+                        words.append(rev_word_map[w])
+                    print('1    ' + ' '.join(words))
+                    num_to_print += 1
+                else:
+                    break
 
-                print('2    **************************************')
+            print('2    **************************************')
 
-        # section: Calculate BLEU-4 scores and print
-        bleu4 = corpus_bleu(references, hypotheses)
+    # section: Calculate BLEU-4 scores and print
+    bleu4 = corpus_bleu(references, hypotheses)
 
-        print(
-            '\n * LOSS - {loss.avg:.3f}, TOP-5 ACCURACY - {top5.avg:.3f}, BLEU-4 - {bleu}\n'.format(
-                loss=losses,
-                top5=top5accs,
-                bleu=bleu4))
+    print(
+        '\n * LOSS - {loss.avg:.3f}, TOP-5 ACCURACY - {top5.avg:.3f}, BLEU-4 - {bleu}\n'.format(
+            loss=losses,
+            top5=top5accs,
+            bleu=bleu4))
 
     return bleu4
 
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+main()
 
-# train_fix_show_and_tell.py
+# V_train_fix_show_and_tell.py

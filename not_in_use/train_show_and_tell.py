@@ -1,14 +1,12 @@
 import sys
 
-# from dataloader.datasets import CaptionDataset
-# from models.fixed_models_no_attention import *
-# from training. import *
-from dataset_loader.datasets import CaptionDataset
-from standart_training.models.fixed_models_no_attention import *
-from standart_training.train_show_and_tell_pack_utils import *
-
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
+
+from dataset_loader.datasets import CaptionDataset
+from not_in_use.models.fixed_models_no_attention import *
+from standart_training.train_show_and_tell_pack_utils import *
+
 
 from utils import *
 import time
@@ -20,9 +18,6 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 
 from torch import nn
-# from pack_utils import *
-# from standart_training.fixed_models_no_attention import Encoder, DecoderWithoutAttention, get_embeddings
-# from dataset_loader.datasets2 import *
 from torch.nn.utils.rnn import pack_padded_sequence
 from nltk.translate.bleu_score import corpus_bleu
 

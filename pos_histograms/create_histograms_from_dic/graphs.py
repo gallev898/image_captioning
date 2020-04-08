@@ -5,14 +5,16 @@ import os
 
 
 if __name__ == '__main__':
-    attention_model = False
-    model_name = 'train_show_and_tell'
-    dics_path = '../create_dic_for_histograms/pos_dic/{}/pos_dic'.format(model_name)
+    attention_model = True
+    model_name = 'run_8'
+    dics_path = '/Users/gallevshalev/Desktop/graphs'
 
     for dic_name in os.listdir(dics_path):
 
-        dic_type = 'top_k' if 'top_k' in dic_name else 'top_p' if 'top_p' in dic_name else 'beam' if 'beam' in dic_name else 'none'
-        exp_or_prop = 'prop' if dic_type == 'top_k' or dic_type == 'top_p' else 'exp'
+        dic_type = 'beam'
+        # dic_type = 'top_k' if 'top_k' in dic_name else 'top_p' if 'top_p' in dic_name else 'beam' if 'beam' in dic_name else 'none'
+        exp_or_prop = 'exp'
+        # exp_or_prop = 'prop' if dic_type == 'top_k' or dic_type == 'top_p' else 'exp'
 
         if not os.path.exists(model_name):
             os.mkdir(model_name)
@@ -24,7 +26,11 @@ if __name__ == '__main__':
         dic = torch.load('{}/{}'.format(dics_path, dic_name))
         pos_dic = dic['pos']
         noun_phrase_sum_of_log_prop = dic['noun_phrase_sum_of_log_prop']
-        sentence_likelihood = dic['sentence_likelihood']
+        try:
+            sentence_likelihood = dic['sentence_likelihood']
+        except:
+            sentence_likelihood = dic['generated_sentences_likelihood']
+            sentence_likelihood = [x[1] for x in sentence_likelihood]
         sentence_likelihood = [i for i in sentence_likelihood if i != None]
 
         # section: noun_phrase_sum_of_log_prop

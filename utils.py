@@ -16,7 +16,7 @@ import torchvision.transforms as transforms
 desktop_path = os.path.join(os.path.join(os.path.expanduser('~')), 'Desktop')
 data_name = 'coco_5_cap_per_img_5_min_word_freq'
 filename = 'BEST_checkpoint_' + data_name + '.pth.tar'
-word_map_file = '../../../output_folder/WORDMAP_' + data_name + '.json'
+word_map_file = '../../output_folder/WORDMAP_' + data_name + '.json'
 data_normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
 

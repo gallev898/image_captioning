@@ -1,15 +1,14 @@
 import sys
 
+
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 from dataset_loader.dataloader import load
-
 from dataset_loader.Pertubation import ImgAugTransformJpegCompression, ImgAugTransformSaltAndPepper, \
-    ImgAugTransformSnow, ImgAugTransformCartoon
-from decoding_strategist_visualizations.top_k_top_p_captions.top_k_p_pack_utils_no_attention import caption_image1
+    ImgAugTransformCartoon, ImgAugTransformSnow
 
 from dataset_loader.datasets import CaptionDataset
-from not_in_use.models.fixed_models_no_attention import DecoderWithoutAttention, Encoder
+from standart_training.V_fixed_models_no_attention import DecoderWithoutAttention, Encoder
 
 from tqdm import *
 import json
@@ -27,9 +26,8 @@ import torchvision.transforms as transforms
 parser = argparse.ArgumentParser()
 parser.add_argument('--beam_size', type=int, default=5)
 parser.add_argument('--cuda', type=int, default=0)
-parser.add_argument('--top_k', type=int, default=0)
-parser.add_argument('--top_p', type=float, default=0.)
 parser.add_argument('--model', type=str)
+parser.add_argument('--trained_model', type=str)
 parser.add_argument('--data', type=str)
 
 parser.add_argument('--run_local', default=False, action='store_true')
@@ -63,9 +61,6 @@ attention_dim = 512  # dimension of attention linear layers
 decoder_dim = 512  # dimension of decoder RNN
 emb_dim = 512  # dimension of word embeddings
 dropout = 0.5
-
-top_k = args.top_k  # NOTICE: int
-top_p = args.top_p  # NOTICE: double
 
 
 def get_model_path_and_save_dir(args):
@@ -115,6 +110,19 @@ def get_models(model_path, device, vocab_size):
 
     return encoder, decoder, representations
 
+
+def embeddings_manipulation(args, representations, device):
+    model_tar= 'NEW_BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar'
+    server_path = '/yoav_stg/gshalev/image_captioning/{}/{}'.format(args.trained_model, model_tar)
+    local_path = '/Users/gallevshalev/Desktop/trained_models/{}/{}'.format(args.trained_model, model_tar)
+    dotproduct = torch.load(local_path if args.run_local else server_path, map_location=device)
+    trained_representation = dotproduct['representations'].t()
+
+    new_representations = []
+    for tr, r in zip(trained_representation, representations.t()):
+        new_representations.append(r * torch.norm(tr))
+
+    return torch.stack(new_representations).t()
 
 def get_word_map(args_):
     if args_.run_local:
@@ -179,7 +187,7 @@ def beam_search_decode(encoder_, decoder_, beam_size_, word_map_, image_, args_,
             h = F.normalize(h, dim=1, p=2)
             representations_ = F.normalize(representations_, dim=0, p=2)
 
-        preds = torch.matmul(h, representations).to(device)
+        preds = torch.matmul(h, representations_).to(device)
         preds *= args.sphere
 
         scores = preds
@@ -238,7 +246,8 @@ def beam_search_decode(encoder_, decoder_, beam_size_, word_map_, image_, args_,
     if len(complete_seqs_scores) == 0:
         print('complete_seqs_scores is empty')
         uncompleted_seq += 1
-        return seqs, None, None, None
+        return None, None, None, None
+        # return seqs, None, None, None
 
     i = complete_seqs_scores.index(max(complete_seqs_scores))
     seq_sum = round(max(complete_seqs_scores).item(), 4)
@@ -257,18 +266,17 @@ def beam_search_decode(encoder_, decoder_, beam_size_, word_map_, image_, args_,
     return seq, top_seq_total_scors, seq_sum, logits_list
 
 
-def caption_image_top_k_p(encoder_, decoder_, image_, word_map_, rev_word_map_, args_, representations_):
-    # beam_size = args_.beam_size
-    seq_, seqs_prop, seqs_logits = caption_image1(encoder_, decoder_, image_, word_map_, top_k, top_p, device,
-                                                  representations_)
+def caption_image_beam_search(encoder_, decoder_, image_, word_map_, rev_word_map_, args_, representations_):
+    beam_size = args_.beam_size
+    seq_, top_seq_total_scors_, seq_sum_, logits_list_ = beam_search_decode(encoder_, decoder_, beam_size, word_map_,
+                                                                            image_, args_, representations_)
 
     if seq_ == None:
-        return None, None, None
+        return None, None, None, None
 
-    sen_likelihood = sum(np.log(seqs_prop[1:-1]))
+    top_seq_total = top_seq_total_scors_[1:-1]
+    ex_top_seq_total = np.exp(top_seq_total_scors_[1:-1])
 
-    seqs_prop = seqs_prop[1:-1]
-    seqs_logits = seqs_logits[1:-1]
     words = [rev_word_map_[ind] for ind in seq_]
     words = words[2:-1]  # notice
     words_as_str = ' '.join(words)
@@ -296,7 +304,7 @@ def caption_image_top_k_p(encoder_, decoder_, image_, word_map_, rev_word_map_, 
             inde = [words_copy.index(str(x)) + lats_i for x in i_str.split()]
         except ValueError:
             print(ValueError.args)
-            return None, None, None
+            return None, None, None, None
 
         np_idx.append(inde)
         print(inde)
@@ -304,7 +312,7 @@ def caption_image_top_k_p(encoder_, decoder_, image_, word_map_, rev_word_map_, 
         words_copy = list(original_str[lats_i:])
 
     idx_count = 0
-    for w, token, exp, logit in zip(words, doc, seqs_prop, seqs_logits):
+    for w, token, score, exp, logit in zip(words, doc, top_seq_total, ex_top_seq_total, logits_list_):
         if token.pos_ in pos_dic_obj:
             pos_dic_obj[token.pos_]['exp'].append(exp)
             pos_dic_obj[token.pos_]['logits'].append(logit)
@@ -313,23 +321,19 @@ def caption_image_top_k_p(encoder_, decoder_, image_, word_map_, rev_word_map_, 
                                        'logits': [logit]}
         for l in np_idx:
             if idx_count in l:
-                l[l.index(idx_count)] = exp
+                l[l.index(idx_count)] = score
                 break
 
         idx_count += 1
     for l in np_idx:
         noun_phrase_sum_of_log_prop.append(sum(l) * -1)
 
-    return seq_, sen_likelihood, words
+    return seq_, top_seq_total_scors_, seq_sum_, words
 
 
 if __name__ == '__main__':
-    
 
-    if args.cosine and 'cosine' not in args.model:
-        raise Exception('cosine flag is on but model is dotproduct')
-    if not args.cosine and 'cosine' in args.model:
-        raise Exception('cosine flag is off but cosine model given')
+
 
     print('Strating beam search : {}'.format(args.beam_size))
 
@@ -340,6 +344,7 @@ if __name__ == '__main__':
     # section: get models
     model_path, save_dir = get_model_path_and_save_dir(args)
     encoder, decoder, representations = get_models(model_path, device, len(word_map))
+    representations = embeddings_manipulation(args, representations, device)
 
     if args.data == 'test':
         # section: dataloader
@@ -361,14 +366,13 @@ if __name__ == '__main__':
             # subsec: move to device
             image = image.to(device)
 
-            # subsec: run top_k/p
-            seq_, sen_likelihood, words = caption_image_top_k_p(encoder, decoder, image, word_map,
-                                                                rev_word_map, args, representations)
-            print(sen_likelihood)
+            # subsec: run beam search
+            seq_, top_seq_total_scors_, seq_sum_, words = caption_image_beam_search(encoder, decoder, image, word_map,
+                                                                                    rev_word_map, args, representations)
             if not None == words:
                 hp_metric_dic['annotations'].append({u'image_id': bi, u'caption': words})
-            if not None == sen_likelihood:
-                generated_sentences_likelihood.append((bi, sen_likelihood))
+            if not None == seq_sum_:
+                generated_sentences_likelihood.append((bi, seq_sum_))
 
     if args.data == 'jpeg':
 
@@ -398,13 +402,13 @@ if __name__ == '__main__':
             # subsec: move to device
             image = image.to(device)
 
-            # subsec: run top_k/p
-            seq_, sen_likelihood, words = caption_image_top_k_p(encoder, decoder, image, word_map,
-                                                                rev_word_map, args, representations)
+            # subsec: run beam search
+            seq_, top_seq_total_scors_, seq_sum_, words = caption_image_beam_search(encoder, decoder, image, word_map,
+                                                                                    rev_word_map, args, representations)
             if not None == words:
                 hp_metric_dic['annotations'].append({u'image_id': bi, u'caption': words})
-            if not None == sen_likelihood:
-                generated_sentences_likelihood.append((bi, sen_likelihood))
+            if not None == seq_sum_:
+                generated_sentences_likelihood.append((bi, seq_sum_))
 
     if args.data == 'salt':
 
@@ -434,13 +438,13 @@ if __name__ == '__main__':
             # subsec: move to device
             image = image.to(device)
 
-            # subsec: run top_k/p
-            seq_, sen_likelihood, words = caption_image_top_k_p(encoder, decoder, image, word_map,
-                                                                rev_word_map, args, representations)
+            # subsec: run beam search
+            seq_, top_seq_total_scors_, seq_sum_, words = caption_image_beam_search(encoder, decoder, image, word_map,
+                                                                                    rev_word_map, args, representations)
             if not None == words:
                 hp_metric_dic['annotations'].append({u'image_id': bi, u'caption': words})
-            if not None == sen_likelihood:
-                generated_sentences_likelihood.append((bi, sen_likelihood))
+            if not None == seq_sum_:
+                generated_sentences_likelihood.append((bi, seq_sum_))
 
     if args.data == 'random':
 
@@ -463,22 +467,18 @@ if __name__ == '__main__':
             # subsec: move to device
             image = image.to(device)
 
-            # subsec: run top_k/p
-            seq_, sen_likelihood, words = caption_image_top_k_p(encoder, decoder, image, word_map,
-                                                                rev_word_map, args, representations)
+            # subsec: run beam search
+            seq_, top_seq_total_scors_, seq_sum_, words = caption_image_beam_search(encoder, decoder, image, word_map,
+                                                                                    rev_word_map, args, representations)
             if not None == words:
                 hp_metric_dic['annotations'].append({u'image_id': None, u'caption': words})
-            if not None == sen_likelihood:
-                generated_sentences_likelihood.append((None, sen_likelihood))
+            if not None == seq_sum_:
+                generated_sentences_likelihood.append((None, seq_sum_))
 
     if args.data == 'cartoon':
 
-        # section: dataloader
         dataloader = load('cartoon', args.run_local, 1, 1)
-        print('len test_loader: {}'.format(len(dataloader)))
-
-        # section: start inference
-        for i, data in tqdm(enumerate(dataloader)):
+        for bi, data in tqdm(enumerate(dataloader)):
             image = data[0].to(device)
             if image.shape[1] != 3:
                 continue
@@ -486,12 +486,85 @@ if __name__ == '__main__':
             image = image.to(device)
 
             # subsec: run top_k/p
-            seq_, sen_likelihood, words = caption_image_top_k_p(encoder, decoder, image, word_map,
-                                                                rev_word_map, args, representations)
+            # subsec: run beam search
+            seq_, top_seq_total_scors_, seq_sum_, words = caption_image_beam_search(encoder, decoder, image, word_map,
+                                                                                    rev_word_map, args, representations)
+            if not None == words:
+                hp_metric_dic['annotations'].append({u'image_id': bi, u'caption': words})
+            if not None == seq_sum_:
+                generated_sentences_likelihood.append((bi, seq_sum_))
+
+    if args.data == 'aug_cartoon':
+
+        transforms_ = [
+            transforms.ToPILImage(),
+            ImgAugTransformCartoon(),
+            lambda x: PIL.Image.fromarray(x),
+            transforms.ToTensor(),
+            data_normalization
+        ]
+        # section: dataloader
+        test_loader = torch.utils.data.DataLoader(
+            CaptionDataset(coco_data_path, data_name, 'TEST', transform=transforms.Compose(transforms_)),
+            batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
+        print('len test_loader: {}'.format(len(test_loader)))
+
+        # section: start inference
+        enumerator = enumerate(test_loader)
+        for bi, (image, caps, caplens, allcaps) in tqdm(enumerator):
+
+            [next(enumerator, None) for _ in range(4)]
+
+            # subsec: collect all current img caps
+            for ci in range(allcaps.shape[1]):
+                gt = [rev_word_map[ind.item()] for ind in allcaps[0][ci]][1:caplens[0][ci].item() - 1]
+                gt_metric_dic['annotations'].append({u'image_id': bi, u'caption': gt})
+
+            # subsec: move to device
+            image = image.to(device)
+
+            # subsec: run beam search
+            seq_, top_seq_total_scors_, seq_sum_, words = caption_image_beam_search(encoder, decoder, image, word_map,
+                                                                                    rev_word_map, args, representations)
+            if not None == words:
+                hp_metric_dic['annotations'].append({u'image_id': bi, u'caption': words})
+            if not None == seq_sum_:
+                generated_sentences_likelihood.append((bi, seq_sum_))
+
+            ###############
+            # import matplotlib.pyplot as plt
+            # import torchvision.transforms as transforms
+            # from PIL import Image
+            # im = image.squeeze(0).numpy()
+            # im = im.transpose((1, 2, 0))
+            # # Undo preprocessing
+            # mean = np.array([0.485, 0.456, 0.406])
+            # std = np.array([0.229, 0.224, 0.225])
+            # im = std * im + mean
+            # # Image needs to be clipped between 0 and 1 or it looks like noise when displayed
+            # im = np.clip(im, 0, 1)
+            # plt.imshow(im)
+            # plt.show()
+            ##############
+
+    if args.data == 'custom':
+
+        dataloader = load('custom', args.run_local, 1, 1)
+
+        for i, data in tqdm(enumerate(dataloader)):
+            image = data[0].to(device)
+            if image.shape[1] != 3:
+                continue
+            # subsec: move to device
+            image = image.to(device)
+
+            # subsec: run beam search
+            seq_, top_seq_total_scors_, seq_sum_, words = caption_image_beam_search(encoder, decoder, image, word_map,
+                                                                                    rev_word_map, args, representations)
             if not None == words:
                 hp_metric_dic['annotations'].append({u'image_id': None, u'caption': words})
-            if not None == sen_likelihood:
-                generated_sentences_likelihood.append((None, sen_likelihood))
+            if not None == seq_sum_:
+                generated_sentences_likelihood.append((None, seq_sum_))
 
     if args.data == 'cropped':
 
@@ -505,32 +578,13 @@ if __name__ == '__main__':
             # subsec: move to device
             image = image.to(device)
 
-            # subsec: run top_k/p
-            seq_, sen_likelihood, words = caption_image_top_k_p(encoder, decoder, image, word_map,
-                                                                rev_word_map, args, representations)
+            # subsec: run beam search
+            seq_, top_seq_total_scors_, seq_sum_, words = caption_image_beam_search(encoder, decoder, image, word_map,
+                                                                                    rev_word_map, args, representations)
             if not None == words:
                 hp_metric_dic['annotations'].append({u'image_id': None, u'caption': words})
-            if not None == sen_likelihood:
-                generated_sentences_likelihood.append((None, sen_likelihood))
-
-    if args.data == 'custom':
-
-        dataloader = load('custom', args.run_local, 1, 1)
-
-        for i, data in tqdm(enumerate(dataloader)):
-            image = data[0].to(device)
-            if image.shape[1] != 3:
-                continue
-            # subsec: move to device
-            image = image.to(device)
-
-            # subsec: run top_k/p
-            seq_, sen_likelihood, words = caption_image_top_k_p(encoder, decoder, image, word_map,
-                                                                rev_word_map, args, representations)
-            if not None == words:
-                hp_metric_dic['annotations'].append({u'image_id': None, u'caption': words})
-            if not None == sen_likelihood:
-                generated_sentences_likelihood.append((None, sen_likelihood))
+            if not None == seq_sum_:
+                generated_sentences_likelihood.append((None, seq_sum_))
 
     if args.data == 'snow':
 
@@ -550,6 +604,7 @@ if __name__ == '__main__':
         # section: start inference
         enumerator = enumerate(test_loader)
         for bi, (image, caps, caplens, allcaps) in tqdm(enumerator):
+
             [next(enumerator, None) for _ in range(4)]
 
             # subsec: collect all current img caps
@@ -560,54 +615,35 @@ if __name__ == '__main__':
             # subsec: move to device
             image = image.to(device)
 
-            # subsec: run top_k/p
-            seq_, sen_likelihood, words = caption_image_top_k_p(encoder, decoder, image, word_map,
-                                                                rev_word_map, args, representations)
+            # subsec: run beam search
+            seq_, top_seq_total_scors_, seq_sum_, words = caption_image_beam_search(encoder, decoder, image, word_map,
+                                                                                    rev_word_map, args, representations)
             if not None == words:
                 hp_metric_dic['annotations'].append({u'image_id': bi, u'caption': words})
-            if not None == sen_likelihood:
-                generated_sentences_likelihood.append((bi, sen_likelihood))
+            if not None == seq_sum_:
+                generated_sentences_likelihood.append((bi, seq_sum_))
 
-    if args.data == 'aug_cartoon':
+            ###############
+            # import matplotlib.pyplot as plt
+            # import torchvision.transforms as transforms
+            # from PIL import Image
+            # im = image.squeeze(0).numpy()
+            # im = im.transpose((1, 2, 0))
+            # # Undo preprocessing
+            # mean = np.array([0.485, 0.456, 0.406])
+            # std = np.array([0.229, 0.224, 0.225])
+            # im = std * im + mean
+            # # Image needs to be clipped between 0 and 1 or it looks like noise when displayed
+            # im = np.clip(im, 0, 1)
+            # plt.imshow(im)
+            # plt.show()
+            ##############
 
-        transforms_ = [
-            transforms.ToPILImage(),
-            ImgAugTransformCartoon(),
-            lambda x: PIL.Image.fromarray(x),
-            transforms.ToTensor(),
-            data_normalization
-        ]
-        # section: dataloader
-        test_loader = torch.utils.data.DataLoader(
-            CaptionDataset(coco_data_path, data_name, 'TEST', transform=transforms.Compose(transforms_)),
-            batch_size=1, shuffle=False, num_workers=0, pin_memory=True)
-        print('len test_loader: {}'.format(len(test_loader)))
 
-        # section: start inference
-        enumerator = enumerate(test_loader)
-        # for bi, (image, caps, caplens, allcaps) in enumerate(test_loader):
-        for bi, (image, caps, caplens, allcaps) in tqdm(enumerator):
-            [next(enumerator, None) for _ in range(4)]
 
-            # subsec: collect all current img caps
-            for ci in range(allcaps.shape[1]):
-                gt = [rev_word_map[ind.item()] for ind in allcaps[0][ci]][1:caplens[0][ci].item() - 1]
-                gt_metric_dic['annotations'].append({u'image_id': bi, u'caption': gt})
-
-            # subsec: move to device
-            image = image.to(device)
-
-            # subsec: run top_k/p
-            seq_, sen_likelihood, words = caption_image_top_k_p(encoder, decoder, image, word_map,
-                                                                rev_word_map, args, representations)
-            if not None == words:
-                hp_metric_dic['annotations'].append({u'image_id': bi, u'caption': words})
-            if not None == sen_likelihood:
-                generated_sentences_likelihood.append((bi, sen_likelihood))
 
     # section: save dic
-    dic_name = 'pos_dic_{}_{}_{}'.format(args.data, 'top_k' if args.top_k > 0 else 'top_p',
-                                         args.top_k if args.top_k else args.top_p)
+    dic_name = 'pos_dic_norm_manipulation_{}_beam_{}'.format(args.data, args.beam_size)
     print('dic name: {}'.format(dic_name))
 
     save_data_path = os.path.join(save_dir, dic_name)
@@ -624,11 +660,10 @@ if __name__ == '__main__':
     else:
         metrics_save_dir = "/yoav_stg/gshalev/image_captioning/{}/{}".format(args.model, 'metrics_roc_and_more')
 
-    metrics_result_file_name = 'metrics_results_{}_{}_{}'.format(args.data, 'top_k' if args.top_k > 0 else 'top_p',
-                                                                 args.top_k if args.top_k > 0 else args.top_p)
+    metrics_result_file_name = 'metrics_results_norm_manipulation_{}_beam_{}'.format(args.data, args.beam_size)
     save_data_path = os.path.join(save_dir, metrics_result_file_name)
 
     torch.save({'gt': gt_metric_dic, 'hyp': hp_metric_dic}, save_data_path)
     print('Saved metrics_roc_and_more results in {}'.format(os.path.join(save_dir, metrics_result_file_name)))
 
-# run_top_k_top_p_no_attention_for_fixed.py
+# V_run_beam_search_fixed_with_norm_manipulation.py
