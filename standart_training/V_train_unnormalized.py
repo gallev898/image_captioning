@@ -36,7 +36,36 @@ data_normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229
 # parser.add_argument('--run_local', default=False, action='store_true')
 # parser.add_argument('--batch_size', default=32, type=int)
 # args = parser.parse_args()
-args = get_args()
+# args = get_args()
+parser = argparse.ArgumentParser(description='train')
+# general
+parser.add_argument('--runname', type=str)
+parser.add_argument('--batch_size', default=32, type=int)
+#cosine
+parser.add_argument('--cosine', default=False, action='store_true')
+# fixed
+parser.add_argument('--sphere', type=int, default=0)
+parser.add_argument('--scale', type=int, default=100)
+parser.add_argument('--normalize_f_x', default=False, action='store_true')
+parser.add_argument('--fixed', default=False, action='store_true')
+#unlikelihood
+parser.add_argument('--num_of_fake', default=16, type=int)
+parser.add_argument('--alpha', default=0.0, type=float)
+
+# replace
+parser.add_argument('--replace_type', type=str)
+
+# fine-tune
+parser.add_argument('--checkpoint', default=None, type=str)
+parser.add_argument('--fine_tune_encoder', default=False, action='store_true')
+parser.add_argument('--fine_tune_epochs', default=-1, type=int)
+
+parser.add_argument('--cuda', type=int, default=0)
+parser.add_argument('--debug', default=False, action='store_true')
+parser.add_argument('--learning_rate', default=-1, type=float)
+
+parser.add_argument('--run_local', default=False, action='store_true')
+args = parser.parse_args()
 
 if not args.run_local:
     import wandb
@@ -74,8 +103,9 @@ data_folder = '../output_folder'  # folder with data files saved by create_input
 
 def get_embeddings(embedding_size, vocab_size):
     word2vec_dictionary = dict()
+    print('embeddings with sacle: {}'.format(args.scale))
     for cls_idx in range(vocab_size):
-        v = np.random.randint(low=-100, high=100, size=embedding_size)
+        v = np.random.randint(low=-args.scale, high=args.scale, size=embedding_size)
         # v = v / np.linalg.norm(v)
         word2vec_dictionary[cls_idx] = torch.from_numpy(v).float()
 
@@ -147,6 +177,9 @@ def main():
 
     # sec: Epochs
     for epoch in range(start_epoch, epochs):
+
+        if epoch == 2:
+            adjust_learning_rate(decoder_optimizer, 0.8)
 
         # sec: Decay learning rate if there is no improvement for 8 consecutive epochs, and terminate training after 20
         if epochs_since_improvement == 20:

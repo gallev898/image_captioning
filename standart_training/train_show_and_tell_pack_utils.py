@@ -83,8 +83,8 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
              'epochs_since_improvement': epochs_since_improvement,
              'bleu-4': bleu4,
              'representations': representations,
-             'encoder': encoder,
-             'decoder': decoder,
+             'encoder': encoder.state_dict(),
+             'decoder': decoder.state_dict(),
              'learneble_S': learneble_S,
              'encoder_optimizer': encoder_optimizer,
              'decoder_optimizer': decoder_optimizer}

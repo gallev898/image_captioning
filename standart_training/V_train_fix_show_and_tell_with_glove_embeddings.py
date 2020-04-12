@@ -55,14 +55,17 @@ print_freq = 100  # print training/validation stats every __ batches
 
 
 def get_embeddings(device):
-
-    # representations = torch.load('../pre_process/glove_representations', map_location=device)
-    representations = torch.load('/yoav_stg/gshalev/image_captioning/output_folder/glove_representations', map_location=device)
+    if args.run_local:
+        representations = torch.load('../pre_process/glove_representations', map_location=device)
+    else:
+        representations = torch.load('/yoav_stg/gshalev/image_captioning/output_folder/glove_representations', map_location=device)
     return representations.t()
 
 
 
 def main():
+    # representations = get_embeddings(device).to(device)
+    # f=0
 
     # section: settings
     global best_bleu4, epochs_since_improvement, start_epoch, data_name, word_map

@@ -5,26 +5,39 @@ from collections import Counter
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--model', type=str)
+parser.add_argument('--decoding', type=str, default='beam_10')
+args = parser.parse_args()
+
+if not os.path.exists('results/{}'.format(args.model)):
+    os.mkdir('results/{}'.format(args.model))
 
 # #sec: paths
-model = 'train_fix_show_and_tell_unnormalized'
-decoding = 'beam_10'
-# --------------------------------
 model_tar = 'NEW_BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar'
 data_name = 'coco_5_cap_per_img_5_min_word_freq'
 path = '/Users/gallevshalev/Desktop/trained_models/{}/inference_data/{}_test_{}'
-model_pathA_metric = path.format(model, 'metrics_results', decoding)
+model_pathA_metric = path.format(args.model, 'metrics_results', args.decoding)
 # --------------------------------
-
+# S load model metric
 modelA_metric = torch.load(model_pathA_metric)
 generated_sentencesA = modelA_metric['hyp']['annotations']
 
-modelA = [x['caption'] for x in generated_sentencesA]
-modelA_counter = Counter([item for sublist in modelA for item in sublist])
+#S model words counter
+modelA_captions = [x['caption'] for x in generated_sentencesA]
+modelA_words_counter = Counter([item for sublist in modelA_captions for item in sublist])
+v = open('results/{}/vocab.txt'.format(args.model), 'w')
+v.write('vocab usage: {}'.format(len(modelA_words_counter)))
+v.close()
 
+#S train data words counter
 train_caps_lst_str = torch.load('train_caps_lst_str')
-train_caps_lst_str_counter = Counter([item for sublist in train_caps_lst_str for item in sublist])
-rest = list(filter(lambda x: x[0] not in modelA_counter.keys(), train_caps_lst_str_counter.items()))
+train_caps_lst_str_words_counter = Counter([item for sublist in train_caps_lst_str for item in sublist])
+
+#S all words the model didnt said
+rest = list(filter(lambda x: x[0] not in modelA_words_counter.keys(), train_caps_lst_str_words_counter.items()))
 
 # sec: word_map
 data_f = '../output_folder'
@@ -34,12 +47,14 @@ with open(word_map_file, 'r') as j:
     word_map = json.load(j)
 rev_word_map = {v: k for k, v in word_map.items()}
 
-model_local_path = '/Users/gallevshalev/Desktop/trained_models/{}/{}'.format(model, model_tar)
+#S load model
+model_local_path = '/Users/gallevshalev/Desktop/trained_models/{}/{}'.format(args.model, model_tar)
 dotproduct = torch.load(model_local_path, map_location='cpu')
 representation = dotproduct['representations'].t()
 
+#S collect analizez of the model words
 freq_to_norm_to_word = []
-for word, freq in modelA_counter.items():
+for word, freq in modelA_words_counter.items():
     if freq > 1000:
         continue
     word_rep_idx = word_map[word]
@@ -53,6 +68,7 @@ freq_lst_by_model = [x[0] for x in sorted]
 norm_lst_by_model = [x[1] for x in sorted]
 word_lst_by_model = [x[2] for x in sorted]
 
+#S collect analizez of the words the model didnt use
 freq_to_norm_to_word = []
 for (word, freq) in rest:
     if freq > 1000:
@@ -68,33 +84,24 @@ freq_lst_rest = [x[0] for x in freq_to_norm_to_word]
 norm_lst_rest = [x[1] for x in freq_to_norm_to_word]
 word_lst_rest = [x[2] for x in freq_to_norm_to_word]
 
+# S black and yello
 plt.scatter(freq_lst_by_model, norm_lst_by_model, c='black', alpha=0.8)
 plt.scatter(freq_lst_rest, norm_lst_rest, c='yellow', alpha=0.1)
-plt.title(model)
-plt.show()
+plt.xlabel('freq')
+plt.ylabel('norm')
+plt.title(args.model)
+plt.savefig('results/{}/{}'.format(args.model, args.model))
+# plt.show()
+plt.clf()
 d = 0
 #-----------------------------------------------------------------------------------
 
 
-model_tar = 'NEW_BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar'
-model_local_path = '/Users/gallevshalev/Desktop/trained_models/{}/{}'.format(model, model_tar)
-dotproduct = torch.load(model_local_path, map_location='cpu')
-# representation = dotproduct['representations'].t()
+#S analyz the embeddings
 representation = dotproduct['decoder']['embedding.weight'].detach()
 
-train_caps_lst_str = torch.load('train_caps_lst_str')
-train_caps_lst_str_counter = Counter([item for sublist in train_caps_lst_str for item in sublist])
-
-
-data_f = '../output_folder'
-word_map_file = os.path.join(data_f, 'WORDMAP_' + data_name + '.json')
-
-with open(word_map_file, 'r') as j:
-    word_map = json.load(j)
-rev_word_map = {v: k for k, v in word_map.items()}
-
 freq_to_norm_to_word = []
-for (word, freq) in train_caps_lst_str_counter.items():
+for (word, freq) in train_caps_lst_str_words_counter.items():
     if freq > 100000:
         continue
     word_rep_idx = word_map[word]
@@ -109,9 +116,18 @@ norm_lst_rest = [x[1] for x in freq_to_norm_to_word]
 word_lst_rest = [x[2] for x in freq_to_norm_to_word]
 
 plt.scatter(freq_lst_rest, norm_lst_rest, c='pink')
-plt.show()
+plt.xlabel('freq')
+plt.ylabel('norm')
+plt.title('embeddings')
+plt.savefig('results/{}/embeddings'.format(args.model))
 
-print('spearman correlation: {}'.format(scipy.stats.spearmanr(freq_lst_rest, norm_lst_rest)))
+# plt.show()
+
+spearmanr = scipy.stats.spearmanr(freq_lst_rest, norm_lst_rest)
+f = open('results/{}/spearman.txt'.format(args.model), 'w')
+f.write('spearman correlation: {}'.format(spearmanr))
+f.close()
+print('spearman correlation: {}'.format(spearmanr))
 g = 0
 
 #-----------------------------------------------------------------------------------
