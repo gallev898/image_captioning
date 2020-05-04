@@ -38,7 +38,7 @@ train_caps_lst_str_words_counter = Counter([item for sublist in train_caps_lst_s
 
 #S all words the model didnt said
 rest = list(filter(lambda x: x[0] not in modelA_words_counter.keys(), train_caps_lst_str_words_counter.items()))
-
+print('rest: {}'.format(len(rest)))
 # sec: word_map
 data_f = '../output_folder'
 word_map_file = os.path.join(data_f, 'WORDMAP_' + data_name + '.json')
@@ -51,16 +51,39 @@ rev_word_map = {v: k for k, v in word_map.items()}
 model_local_path = '/Users/gallevshalev/Desktop/trained_models/{}/{}'.format(args.model, model_tar)
 dotproduct = torch.load(model_local_path, map_location='cpu')
 representation = dotproduct['representations'].t()
+embedding_weight = dotproduct['decoder']['embedding.weight']
+
+
+#for spearman
+fre2norm = []
+for word1, freq1 in train_caps_lst_str_words_counter.items():
+    word_rep_idx = word_map[word1]
+    rep = representation[word_rep_idx]
+    rep_norm = torch.norm(rep).item()
+    fre2norm.append((freq1, rep_norm, word1))
+    # freq_to_norm_to_word.append((freq, rep_norm, word))
+
+sorted1 = sorted(fre2norm, key=lambda x: x[0])
+
+freq_ = [x[0] for x in sorted1]
+norm_ = [x[1] for x in sorted1]
+word_ = [x[2] for x in sorted1]
+
+
+
+
+
 
 #S collect analizez of the model words
 freq_to_norm_to_word = []
 for word, freq in modelA_words_counter.items():
-    if freq > 1000:
+    if train_caps_lst_str_words_counter[word] > 5000:
         continue
     word_rep_idx = word_map[word]
     rep = representation[word_rep_idx]
     rep_norm = torch.norm(rep).item()
-    freq_to_norm_to_word.append((freq, rep_norm, word))
+    freq_to_norm_to_word.append((train_caps_lst_str_words_counter[word], rep_norm, word))
+    # freq_to_norm_to_word.append((freq, rep_norm, word))
 
 sorted = sorted(freq_to_norm_to_word, key=lambda x: x[0])
 
@@ -71,7 +94,7 @@ word_lst_by_model = [x[2] for x in sorted]
 #S collect analizez of the words the model didnt use
 freq_to_norm_to_word = []
 for (word, freq) in rest:
-    if freq > 1000:
+    if freq > 5000:
         continue
     word_rep_idx = word_map[word]
     rep = representation[word_rep_idx]
@@ -85,19 +108,19 @@ norm_lst_rest = [x[1] for x in freq_to_norm_to_word]
 word_lst_rest = [x[2] for x in freq_to_norm_to_word]
 
 # S black and yello
-plt.scatter(freq_lst_by_model, norm_lst_by_model, c='black', alpha=0.8)
+# plt.scatter(freq_lst_by_model, norm_lst_by_model, c='black', alpha=0.1)
 plt.scatter(freq_lst_rest, norm_lst_rest, c='yellow', alpha=0.1)
 plt.xlabel('word frequency')
 plt.ylabel('word representation norm')
 plt.title(args.model)
-plt.savefig('results/{}/{}'.format(args.model, args.model))
+plt.savefig('results/{}/{}2'.format(args.model, args.model))
 # plt.show()
 plt.clf()
 d = 0
 #S-------------------------------------------
 freq_to_norm_to_word = []
 for (word, freq) in train_caps_lst_str_words_counter.items():
-    if freq > 1000:
+    if freq > 5000:
         continue
     word_rep_idx = word_map[word]
     rep = representation[word_rep_idx]
@@ -110,10 +133,12 @@ freq_lst = [x[0] for x in freq_to_norm_to_word]
 norm_lst = [x[1] for x in freq_to_norm_to_word]
 word_lst = [x[2] for x in freq_to_norm_to_word]
 
+spearman = scipy.stats.spearmanr(freq_, norm_)
 train_spearmanr = scipy.stats.spearmanr(freq_lst, norm_lst)
 rest_spearmanr = scipy.stats.spearmanr(freq_lst_rest, norm_lst_rest)
 model_spearmanr = scipy.stats.spearmanr(freq_lst_by_model, norm_lst_by_model)
 f = open('results/{}/spearman.txt'.format(args.model), 'w')
+f.write('spearman__ correlation by train data: {}\n'.format(spearman))
 f.write('spearman correlation by train data: {}\n'.format(train_spearmanr))
 f.write('spearman correlation by model data: {}\n'.format(model_spearmanr))
 f.write('spearman correlation by rest data: {}'.format(rest_spearmanr))

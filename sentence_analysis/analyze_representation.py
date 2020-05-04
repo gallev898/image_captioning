@@ -2,14 +2,17 @@ import os
 import json
 import torch.nn.functional as F
 import torch
+import random
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import Counter
 
-model = 'V_train_fix_show_and_tell_extra_embedding'
-model_tar = 'BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar'
+model = 'train_show_ATTEND_and_tell'
+# model = 'V_train_fix_show_and_tell_extra_embedding'
+model_tar = 'NEW_BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar'
 model = torch.load('/Users/gallevshalev/Desktop/trained_models/{}/{}'.format(model, model_tar), map_location='cpu')
 representations = model['representations'].t()
+embedding_weight = model['decoder']['embedding.weight']
 
 # sec: word_map
 data_f = '../output_folder'
@@ -20,38 +23,72 @@ with open(word_map_file, 'r') as j:
 rev_word_map = {v: k for k, v in word_map.items()}
 
 word_norm = []
-cosine_similarity = []
 norms_distribution=[]
-for idx, rep in enumerate(representations):
-    if idx == 9490:
-        word = 'extra_embedding'
-        word_norm.append((word, torch.norm(rep)))
-    else:
+
+examed_words = ['cat']
+# examed_words = ['bartender','doctor','learn', 'fix', 'bed', 'couch']
+
+cosine_similarity_out = []
+cosine_similarity_in = []
+euc_out = []
+euc_in = []
+###########################
+for i in range(10000):
+    first_word_idx = random.randint(0,9489)
+    second_word_idx = random.randint(0,9489)
+    # second_word_idx = first_word_idx
+
+    first_word = rev_word_map[first_word_idx]
+    second_word = rev_word_map[second_word_idx]
+
+    first_word_out_rep = representations[first_word_idx]
+    second_word_out_rep = representations[second_word_idx]
+
+    first_word_in_rep = embedding_weight[first_word_idx]
+    second_word_in_rep = embedding_weight[second_word_idx]
+
+    euc_out.append(np.linalg.norm(first_word_out_rep.detach().numpy()-second_word_out_rep.detach().numpy()))
+    cos_out = np.dot((first_word_out_rep.detach().numpy() /torch.norm(first_word_out_rep).item()),
+                 (second_word_out_rep.detach().numpy() /torch.norm(second_word_out_rep).item()))
+
+    euc_in.append(np.linalg.norm(first_word_in_rep.detach().numpy()-second_word_in_rep.detach().numpy()))
+    cos_in = np.dot((first_word_in_rep.detach().numpy() /torch.norm(first_word_in_rep).item()),
+                     (second_word_in_rep.detach().numpy() /torch.norm(second_word_in_rep).item()))
+    print('{} {} {} {}'.format(first_word, second_word, cos_in, cos_out))
+    cosine_similarity_in.append((first_word, second_word, cos_in))
+    cosine_similarity_out.append((first_word, second_word, cos_out))
+
+plt.scatter(euc_out, euc_in, c='yellow', alpha=0.1)
+# plt.scatter([x[2] for x in cosine_similarity_out], [x[2] for x in cosine_similarity_in], c='yellow', alpha=0.1)
+plt.show()
+#########################
+# for ew in word_map.keys():
+for ew in examed_words:
+    ew_idx = word_map[ew]
+    ew_norm = torch.norm(representations[ew_idx]).item()
+
+    for idx, rep in enumerate(representations):
         word = rev_word_map[idx]
-        word_norm.append((word, torch.norm(rep)))
-    cosine_similarity.append((np.dot((representations[9490].detach().numpy() /torch.norm(representations[9490]).item()),
-                                     (rep.detach().numpy() /torch.norm(rep).item())), word, torch.norm(rep).item()))
-    norms_distribution.append(torch.norm(rep).item())
-f = 0
+        word_norm = torch.norm(rep).item()
 
-if idx == 9490:
-    norm_9 = [x[0] for x in list(filter(lambda x: x[1].item() >= 9 and x[1].item() <= 10, word_norm))]
+        cos = np.dot((representations[ew_idx].detach().numpy() /torch.norm(representations[ew_idx]).item()),
+                     (rep.detach().numpy() /word_norm))
+        cosine_similarity_out.append((ew, word, cos))
 
-    A = torch.load('train_caps_lst_str')
-    cA = Counter([item for sublist in A for item in sublist])
-
-    norm_9_freq  = list(filter(lambda x: x[0] in norm_9, cA.items()))
-    norm_9_freq.sort(key=lambda x: x[1])
-
-    cosine_similarity.sort(key=lambda x: x[0])
-    cosine_similarity.reverse()
-    top_cosine=[]
-    for i in range(100):
-        print(cosine_similarity[i])
-        top_cosine.append(cosine_similarity[i])
-
-    plt.hist(norms_distribution, bins=int(max(norms_distribution)))
-    plt.show()
-h = 0
+    for idx, rep in enumerate(embedding_weight):
+        word = rev_word_map[idx]
+        word_norm = torch.norm(rep).item()
 
 
+        cos = np.dot((embedding_weight[ew_idx].detach().numpy() /torch.norm(embedding_weight[ew_idx]).item()),
+                     (rep.detach().numpy() /word_norm))
+        cosine_similarity_in.append((ew, word, cos))
+
+###############
+plt.scatter(cosine_similarity_out, cosine_similarity_in, c='yellow', alpha=0.1)
+plt.show()
+
+cosine_similarity_out.sort(key=lambda x: x[1])
+list.reverse(cosine_similarity_out)
+# print([x[0] for x in cosine_similarity[0:10]])
+print(cosine_similarity_out[0:10])

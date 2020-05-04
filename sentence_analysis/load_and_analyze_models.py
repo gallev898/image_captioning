@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--run_local', default=False, action='store_true')
 parser.add_argument('--modelA', type=str)
 parser.add_argument('--modelB', type=str)
-parser.add_argument('--decoding', type=str, default='beam_1')
+parser.add_argument('--decoding', type=str, default='test_beam_10')
 parser.add_argument('--model_file_name', type=str,
                     default='NEW_BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar')
 args = parser.parse_args()
@@ -31,7 +31,7 @@ print('args.modelB: {}'.format(args.modelB))
 coco_data_path = '/Users/gallevshalev/PycharmProjects/image_captioning/output_folder' if args.run_local else '/yoav_stg/gshalev/image_captioning/output_folder'
 data_name = 'coco_5_cap_per_img_5_min_word_freq'
 data_normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-path = '/Users/gallevshalev/Desktop/trained_models/{}/inference_data/{}_test_{}'
+path = '/Users/gallevshalev/Desktop/trained_models/{}/inference_data/{}_{}'
 
 # sec: write to file
 if write:
@@ -47,7 +47,34 @@ model_pathB_pos_dic = path.format(args.modelB, 'pos_dic', args.decoding)
 # sec: load models pos and dic
 modelA_metric = torch.load(model_pathA_metric)
 modelB_metric = torch.load(model_pathB_metric)
+#----------------------------
+A = torch.load('train_caps_lst_str')
+cA = Counter([item for sublist in A for item in sublist])
+sort = sorted([(k, v) for k, v in cA.items()], key=lambda x: x[1])
+rare_words = [x[0] for x in sorted([(k, v) for k, v in cA.items()], key=lambda x: x[1])][6000:7000]
 
+ff = open('compare_show_and_tell_dotproduct_and_fixed.txt', 'w')
+cap2len = [(x, len(x['caption'])) for x in modelB_metric['hyp']['annotations']]
+dotproduct_caps = [x for x in modelA_metric['hyp']['annotations']]
+fixed_caps = [x for x in modelB_metric['hyp']['annotations']]
+in_ =[]
+for dc in dotproduct_caps:
+    l = list(filter(lambda x: dc['image_id'] == x['image_id'], fixed_caps))
+    if len(l) > 0:
+        fixed_model_caption = l[0]['caption']
+        if len([i for i in fixed_model_caption if i in rare_words]) > 0:
+        # if len(fixed_model_caption)>len(a[0]['caption'])+1:
+            in_.append(dc['image_id'])
+            ff.write('-------------------------\n')
+            ff.write(str(dc['image_id']))
+            ff.write('\n')
+            ff.write(' '.join(dc['caption']))
+            ff.write('\n')
+            ff.write(' '.join(fixed_model_caption))
+            ff.write('\n')
+print(in_)
+exit()
+#----------------------------
 modelA_pos_dic = torch.load(model_pathA_pos_dic)
 modelB_pos_dic = torch.load(model_pathB_pos_dic)
 

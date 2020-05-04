@@ -145,6 +145,7 @@ def main():
         CaptionDataset(data_f, data_name, 'VAL', transform=transforms.Compose([data_normalization])),
         batch_size=1, shuffle=True, num_workers=workers, pin_memory=True)
 
+    model_parameters =  sum(p.numel() for p in decoder.parameters() if p.requires_grad)
     # sec: Epochs
     for epoch in range(start_epoch, epochs):
 
@@ -153,6 +154,14 @@ def main():
             print('break after : epochs_since_improvement == 20')
             break
 
+        # section: fine tune encoder
+        if epoch == args.fine_tune_epochs:
+            print('fine tuning after epoch({}) == args.fine_tune_epochs({})'.format(epoch, args.fine_tune_epochs))
+            encoder.fine_tune(args.fine_tune_encoder)
+            encoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, encoder.parameters()),
+                                                 lr=encoder_lr)
+
+        # section: adjust LR after 8 epochs without improvment
         if epochs_since_improvement > 0 and epochs_since_improvement % 8 == 0:
             print('adjust lr afetr : epochs_since_improvement > 0 and epochs_since_improvement % 8 == 0')
             adjust_learning_rate(decoder_optimizer, 0.8)
