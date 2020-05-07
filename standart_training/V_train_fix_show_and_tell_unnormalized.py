@@ -94,7 +94,9 @@ def get_embeddings(embedding_size, vocab_size):
         word2vec_dictionary[cls_idx] = torch.from_numpy(v).float()
 
     w2v_matrix = torch.stack(list(word2vec_dictionary.values()), dim=1)
-    return w2v_matrix
+    bias = torch.tensor(vocab_size)
+
+    return w2v_matrix, bias
 
 
 def main():
@@ -119,7 +121,9 @@ def main():
     rev_word_map = {v: k for k, v in word_map.items()}
 
     # section: representation
-    representations = get_embeddings(decoder_dim, len(word_map)).to(device)
+    representations, bias = get_embeddings(decoder_dim, len(word_map))
+    representations = representations.to(device)
+    bias = bias.to(device).requires_grad_(True)
 
     # section: not fixed
     if not args.fixed:
@@ -138,6 +142,8 @@ def main():
     # section: not fixed
     if not args.fixed:
         decoder_optimizer.add_param_group({'params': representations})
+
+    decoder_optimizer.add_param_group({'params': bias})
 
     # section: encoder
     encoder = Encoder()
@@ -180,11 +186,11 @@ def main():
             break
 
         # section: fine tune encoder
-        if epoch == args.fine_tune_epochs:
-            print('fine tuning after epoch({}) == args.fine_tune_epochs({})'.format(epoch, args.fine_tune_epochs))
-            encoder.fine_tune(args.fine_tune_encoder)
-            encoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, encoder.parameters()),
-                                                 lr=encoder_lr)
+        # if epoch == args.fine_tune_epochs:
+        #     print('fine tuning after epoch({}) == args.fine_tune_epochs({})'.format(epoch, args.fine_tune_epochs))
+        #     encoder.fine_tune(args.fine_tune_encoder)
+        #     encoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, encoder.parameters()),
+        #                                          lr=encoder_lr)
 
         # section: adjust LR after 8 epochs without improvment
         if epochs_since_improvement > 0 and epochs_since_improvement % 8 == 0:
@@ -199,7 +205,7 @@ def main():
               criterion=criterion,
               encoder_optimizer=encoder_optimizer,
               decoder_optimizer=decoder_optimizer,
-              epoch=epoch, representations=representations)
+              epoch=epoch, representations=representations, bias=bias)
 
         # section: eval
         print('--------------2222222222-----------Start validation----------epoch-{}'.format(epoch))
@@ -208,12 +214,12 @@ def main():
                                     encoder=encoder,
                                     decoder=decoder,
                                     criterion=criterion,
-                                    rev_word_map=rev_word_map, representations=representations, word_map=word_map)
+                                    rev_word_map=rev_word_map, representations=representations, word_map=word_map, bias=bias)
 
         print('9999999999999- recent blue {}'.format(recent_bleu4))
         print('--------------3333333333-----------Start val without teacher forcing----------epoch-{}'.format(epoch))
         with torch.no_grad():
-            caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map, representations)
+            caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map, representations, bias)
             print('!@#!@!#!#@!#@!#@ DONE WITH TRAIN VAL AND VAL WITHOUT TEACHER FORCING FOR EPOCH :{}'.format(epoch))
 
         # section: save model if there was an improvement
@@ -226,10 +232,10 @@ def main():
             epochs_since_improvement = 0
 
         save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
-                        decoder_optimizer, recent_bleu4, is_best, representations=representations, runname=args.runname)
+                        decoder_optimizer, recent_bleu4, is_best, representations=representations,bias=bias, runname=args.runname)
 
 
-def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch, representations):
+def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch, representations, bias):
     # section: train mode
     decoder.train()  # train mode (dropout and batchnorm is used)
     encoder.train()
@@ -256,7 +262,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
         # section:  Forward prop.
         imgs = encoder(imgs)
-        scores, targets, decode_lengths, _, sort_ind = decoder(imgs, caps, caplens, args, representations)
+        scores, targets, decode_lengths, _, sort_ind = decoder(imgs, caps, caplens, args, representations, bias)
 
         # Remove timesteps that we didn't decode at, or are pads
         # pack_padded_sequence is an easy trick to do this
@@ -307,7 +313,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
                            "Test Loss": losses.avg})
 
 
-def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_map, representations, beam_size=3):
+def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_map, representations,bias, beam_size=3):
     for i, (imgs, caps, caplens, allcaps) in enumerate(val_loader):
         if i > 100 or (args.debug and i > 2):
             break
@@ -356,6 +362,7 @@ def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_m
             if args.sphere > 0:
                 scores *= args.sphere
 
+            scores += bias
             # scores = decoder.fc(h)  # (s, vocab_size)
             # scores = F.log_softmax(scores, dim=1)
             scores_copy = scores.clone()
@@ -416,7 +423,7 @@ def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_m
             print('5    ' + ' '.join(words))
 
 
-def validate(val_loader, encoder, decoder, criterion, rev_word_map, representations, word_map):
+def validate(val_loader, encoder, decoder, criterion, rev_word_map, representations, word_map, bias):
     # section: eval mode
     decoder.eval()
     encoder.eval()
@@ -444,7 +451,7 @@ def validate(val_loader, encoder, decoder, criterion, rev_word_map, representati
 
         # section: Forward prop.
         imgs = encoder(imgs)
-        scores, caps_sorted, decode_lengths, _, sort_ind = decoder(imgs, caps, caplens, args, representations)
+        scores, caps_sorted, decode_lengths, _, sort_ind = decoder(imgs, caps, caplens, args, representations, bias)
 
         # notice: Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
         targets = caps_sorted[:, 1:]

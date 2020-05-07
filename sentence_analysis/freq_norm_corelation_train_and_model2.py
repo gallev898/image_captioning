@@ -7,6 +7,13 @@ import numpy as np
 import scipy.stats
 import argparse
 
+import matplotlib.style as style
+import matplotlib
+
+style.use('seaborn-poster') #sets the size of the charts
+style.use('ggplot')
+matplotlib.rc('font', size=22)
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str)
 parser.add_argument('--decoding', type=str, default='beam_10')
@@ -108,11 +115,11 @@ norm_lst_rest = [x[1] for x in freq_to_norm_to_word]
 word_lst_rest = [x[2] for x in freq_to_norm_to_word]
 
 # S black and yello
-# plt.scatter(freq_lst_by_model, norm_lst_by_model, c='black', alpha=0.1)
-plt.scatter(freq_lst_rest, norm_lst_rest, c='yellow', alpha=0.1)
-plt.xlabel('word frequency')
-plt.ylabel('word representation norm')
-plt.title(args.model)
+plt.scatter(freq_lst_by_model, norm_lst_by_model, c='red', alpha=0.2)
+plt.scatter(freq_lst_rest, norm_lst_rest, c='green', alpha=0.2)
+plt.xlabel('Frequency', fontsize=25)
+plt.ylabel('Norm', fontsize=25)
+# plt.title(args.model)
 plt.savefig('results/{}/{}2'.format(args.model, args.model))
 # plt.show()
 plt.clf()

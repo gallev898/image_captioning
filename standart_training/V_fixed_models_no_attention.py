@@ -188,7 +188,7 @@ class DecoderWithoutAttention(nn.Module):
         # c = self.init_c(mean_encoder_out)
         return h, c
 
-    def forward(self, encoder_out, encoded_captions, caption_lengths, args, representations):
+    def forward(self, encoder_out, encoded_captions, caption_lengths, args, representations, bias):
         """
         Forward propagation.
 
@@ -239,6 +239,9 @@ class DecoderWithoutAttention(nn.Module):
 
             if args.sphere > 0:
                 preds *= args.sphere
+
+            preds += bias
+
             predictions[:batch_size_t, t+1, :] = preds
         return predictions, encoded_captions, decode_lengths, None, sort_ind
 

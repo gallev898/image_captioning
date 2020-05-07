@@ -165,7 +165,7 @@ class DecoderWithAttention(nn.Module):
         c = self.init_c(mean_encoder_out)
         return h, c
 
-    def forward(self, encoder_out, encoded_captions, caption_lengths, args, representations):
+    def forward(self, encoder_out, encoded_captions, caption_lengths, args, representations, bias):
         """
         Forward propagation.
 
@@ -229,9 +229,11 @@ class DecoderWithAttention(nn.Module):
                 h = F.normalize(h, dim=1, p=2)
                 representations = F.normalize(representations, dim=0, p=2)
 
-            preds = torch.matmul(h, representations).to(self.device)
+            preds = torch.matmul(h, representations)
             if args.sphere > 0:
                 preds *= args.sphere
+
+            preds += bias
 
             predictions[:batch_size_t, t, :] = preds
             alphas[:batch_size_t, t, :] = alpha

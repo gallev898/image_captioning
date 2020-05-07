@@ -51,8 +51,34 @@ modelB_metric = torch.load(model_pathB_metric)
 #----------------------------
 A = torch.load('train_caps_lst_str')
 cA = Counter([item for sublist in A for item in sublist])
-sort = sorted([(k, v) for k, v in cA.items()], key=lambda x: x[1])
 rare_words = [x[0] for x in sorted([(k, v) for k, v in cA.items()], key=lambda x: x[1]) if 200 <= x[1] <= 500]
+
+modelA_pos_dic = torch.load(model_pathA_pos_dic)
+modelB_pos_dic = torch.load(model_pathB_pos_dic)
+
+# sec: models generated sentences
+generated_sentencesA = modelA_metric['hyp']['annotations']
+generated_sentencesB = modelB_metric['hyp']['annotations']
+
+A = [x['caption'] for x in generated_sentencesA]
+B = [x['caption'] for x in generated_sentencesB]
+cA = Counter([item for sublist in A for item in sublist])
+cB = Counter([item for sublist in B for item in sublist])
+
+#sec: get sentences with rare words
+# rare_words = [x[0] for x in list(filter(lambda x: x[1] <=1, cA.items()))]
+sen_with_rare_words_A = list(filter(lambda x: any(elem in rare_words for elem in x['caption']), generated_sentencesA))
+sen_with_rare_words_B = list(filter(lambda x: any(elem in rare_words for elem in x['caption']), generated_sentencesB))
+# len([elem  for x in generated_sentencesA for elem in x['caption'] if elem in rare_words])
+
+
+g=0
+
+
+
+
+
+
 # rare_words = [x[0] for x in sorted([(k, v) for k, v in cA.items()], key=lambda x: x[1])][7000:8000]
 print([x for x in sorted([(k, v) for k, v in cA.items()], key=lambda x: x[1])][7000])
 print([x for x in sorted([(k, v) for k, v in cA.items()], key=lambda x: x[1])][8000])

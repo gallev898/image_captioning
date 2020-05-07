@@ -77,11 +77,12 @@ def clip_gradient(optimizer, grad_clip):
 
 
 def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer, decoder_optimizer,
-                    bleu4, is_best, representations=None, learneble_S =None, runname=None):
+                    bleu4, is_best, representations=None,bias=None, learneble_S =None, runname=None):
 
     state = {'epoch': epoch,
              'epochs_since_improvement': epochs_since_improvement,
              'bleu-4': bleu4,
+             'bias': bias,
              'representations': representations,
              'encoder': encoder.state_dict(),
              'decoder': decoder.state_dict(),

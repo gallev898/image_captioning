@@ -7,12 +7,41 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import Counter
 
-model = 'train_show_and_tell_dotproduct_with_bias'
+model = 'train_show_ATTEND_and_tell'
 # model = 'V_train_fix_show_and_tell_extra_embedding'
-model_tar = 'BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar'
-# model_tar = 'NEW_BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar'
+model_tar = 'NEW_BEST_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth.tar'
 model = torch.load('/Users/gallevshalev/Desktop/trained_models/{}/{}'.format(model, model_tar), map_location='cpu')
 representations = model['representations'].t()
+
+
+data_f = '../output_folder'
+data_name = 'coco_5_cap_per_img_5_min_word_freq'
+word_map_file = os.path.join(data_f, 'WORDMAP_' + data_name + '.json')
+with open(word_map_file, 'r') as j:
+    word_map = json.load(j)
+rev_word_map = {v: k for k, v in word_map.items()}
+
+bird = word_map['bird']
+duck = word_map['duck']
+seagull = word_map['seagull']
+words = [(representations[bird], 'bird'), (representations[duck], 'duck'), (representations[seagull], 'seagull')]
+for w, s in words:
+    print('{} norm {}'.format(s, torch.norm(w)))
+    for ww, ss in words:
+        cos = np.dot((w.detach().numpy() /torch.norm(w).item()),
+               (ww.detach().numpy() /torch.norm(ww).item()))
+        print('cos {}-{}: {}'.format(s,ss,cos ))
+g=0
+
+
+
+
+
+
+
+
+
+
 embedding_weight = model['decoder']['embedding.weight']
 
 # sec: word_map

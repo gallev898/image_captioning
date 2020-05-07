@@ -79,8 +79,9 @@ def get_embeddings(embedding_size, vocab_size):
         v = v / np.linalg.norm(v)
         word2vec_dictionary[cls_idx] = torch.from_numpy(v).float()
 
+    bias = torch.ones(vocab_size)
     w2v_matrix = torch.stack(list(word2vec_dictionary.values()), dim=1)
-    return w2v_matrix
+    return w2v_matrix, bias
 
 
 def main():
@@ -116,7 +117,9 @@ def main():
     encoder = encoder.to(device)
 
     # section: representation
-    representations = get_embeddings(decoder_dim, len(word_map)).to(device)
+    representations, bias = get_embeddings(decoder_dim, len(word_map))
+    representations = representations.to(device)
+    bias = bias.to(device).requires_grad_(True)
 
     # section: not fixed
     if not args.fixed:
@@ -124,6 +127,8 @@ def main():
 
     if not args.fixed:
         decoder_optimizer.add_param_group({'params': representations})
+
+    decoder_optimizer.add_param_group({'params': bias})
 
     # sec: wandb
     if not args.run_local:
@@ -175,7 +180,7 @@ def main():
               encoder_optimizer=encoder_optimizer,
               decoder_optimizer=decoder_optimizer,
               epoch=epoch,
-              representations=representations)
+              representations=representations, bias=bias)
 
         # sec: val with teacher forcing
         print('--------------2222222222-----------Start validation----------epoch-{}'.format(epoch))
@@ -184,14 +189,14 @@ def main():
                                     encoder=encoder,
                                     decoder=decoder,
                                     criterion=criterion,
-                                    representations=representations,
+                                    representations=representations,bias=bias,
                                     rev_word_map=rev_word_map)
 
         print('9999999999999- recent blue {}'.format(recent_bleu4))
         print('--------------3333333333-----------Start val without teacher forcing----------epoch-{}'.format(epoch))
         # sec: val without teacher forsing
         with torch.no_grad():
-            caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map, representations)
+            caption_image_beam_search(encoder, decoder, val_loader_for_val, word_map, rev_word_map, representations, bias)
         print('!@#!@!#!#@!#@!#@ DONE WITH TRAIN VAL AND VAL WITHOUT TEACHER FORCING FOR EPOCH :{}'.format(epoch))
 
         # Check if there was an improvement
@@ -208,7 +213,7 @@ def main():
                         decoder_optimizer, recent_bleu4, is_best, representations, args.runname)
 
 
-def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch, representations):
+def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch, representations, bias):
     # train mode
     decoder.train()  # train mode (dropout and batchnorm is used)
     encoder.train()
@@ -232,7 +237,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
         # sec: Forward prop.
         imgs = encoder(imgs)
-        scores, caps_sorted, decode_lengths, alphas, sort_ind = decoder(imgs, caps, caplens, args, representations)
+        scores, caps_sorted, decode_lengths, alphas, sort_ind = decoder(imgs, caps, caplens, args, representations, bias)
 
         # sec: Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
         targets = caps_sorted[:, 1:]
@@ -288,7 +293,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
                            "Test Loss": losses.avg})
 
 
-def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_map, representations, beam_size=3):
+def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_map, representations, bias, beam_size=3):
     for i, (imgs, caps, caplens, allcaps) in enumerate(val_loader):
         if i > 100 or (args.debug and i > 2):
             break
@@ -350,7 +355,7 @@ def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_m
             if args.cosine:
                 h = F.normalize(h, dim=1, p=2)
                 representations = F.normalize(representations, dim=0, p=2)
-            scores = torch.matmul(h, representations).to(device)
+            scores = torch.matmul(h, representations) + bias
 
             if args.sphere > 0:
                 scores *= args.sphere
@@ -418,7 +423,7 @@ def caption_image_beam_search(encoder, decoder, val_loader, word_map, rev_word_m
             print('5    ' + ' '.join(words))
 
 
-def validate(val_loader, encoder, decoder, criterion, representations, rev_word_map):
+def validate(val_loader, encoder, decoder, criterion, representations, bias, rev_word_map):
 
     # eval mode
     decoder.eval()
@@ -453,7 +458,7 @@ def validate(val_loader, encoder, decoder, criterion, representations, rev_word_
         if encoder is not None:
             imgs = encoder(imgs)
 
-        scores, caps_sorted, decode_lengths, alphas, sort_ind = decoder(imgs, caps, caplens, args, representations)
+        scores, caps_sorted, decode_lengths, alphas, sort_ind = decoder(imgs, caps, caplens, args, representations, bias)
 
         # Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
         targets = caps_sorted[:, 1:]

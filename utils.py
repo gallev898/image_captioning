@@ -5,6 +5,7 @@ sys.path.append('/home/mlspeech/gshalev/anaconda3/envs/python3_env/lib')
 sys.path.append('/home/mlspeech/gshalev/gal/image_cap2')
 # sys.path.append('/home/mlspeech/gshalev/gal/image_captioning')
 
+from standart_training.V_fixed_models_no_attention import DecoderWithoutAttention, Encoder
 
 import json
 import os
